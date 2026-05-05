@@ -53,6 +53,7 @@ This package provides a CLI tool for downloading and converting WebAudioFont ass
 webaudiofont 0000_Chaos_sf2_file dest/instrument.json
 ```
 
+You can find instruments here: [WebAudioFont](https://github.com/surikov/webaudiofont#catalog-of-instruments)
 
 ## Browser Compatibility
 
@@ -70,7 +71,7 @@ Requires a modern browser with support for:
 
 ## License
 
-MIT License
+[LICENCE](LICENCE)
 
 ## Author
 
