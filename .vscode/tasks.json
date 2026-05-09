@@ -24,6 +24,18 @@
 				"panel": "dedicated",
 				"reveal": "never"
 			}
+		},
+		{
+			"label": "Watch: Sass",
+			"type": "shell",
+			"command": "npm run sass:watch",
+			"isBackground": true,
+			"problemMatcher": [],
+			"presentation": {
+				"group": "dev-group",
+				"panel": "dedicated",
+				"reveal": "never"
+			}
 		}
 	]
 }

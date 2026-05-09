@@ -1582,7 +1582,11 @@ var MidiAudioPlayer = class extends index.Player {
     await this.loadArrayBuffer(content);
   }
 };
+
+// index.js
+window.MidiAudioPlayer = MidiAudioPlayer;
+var index_default = MidiAudioPlayer;
 export {
-  MidiAudioPlayer as default
+  index_default as default
 };
 //# sourceMappingURL=index.js.map

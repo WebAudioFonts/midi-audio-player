@@ -1,16 +1,20 @@
 {
   "name": "midi-audio-player",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Javascript Midi Audio Player for WebAudioFont",
   "keywords": [
-    "audio",
-    "player",
     "midi",
-    "mid",
-    "js",
-    "webaudiofont"
+    "midi-player",
+    "webaudio",
+    "webaudiofont",
+    "audio",
+    "music",
+    "browser-audio",
+    "midi-js",
+    "web-audio-api",
+    "midi-playback"
   ],
-  "homepage": "https://github.com/ZmotriN/midi-audio-player#readme",
+  "homepage": "https://zmotrin.github.io/midi-audio-player/",
   "bugs": {
     "url": "https://github.com/ZmotriN/midi-audio-player/issues"
   },
@@ -24,6 +28,14 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "unpkg": "./dist/midi-audio-player.min.js",
+  "jsdelivr": "./dist/midi-audio-player.min.js",
+  "files": [
+    "dist",
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -33,7 +45,9 @@
   "scripts": {
     "build": "node scripts/watch.js --build-only",
     "dev": "node scripts/watch.js",
-    "serve:site": "browser-sync start --server --startPath /site/ --files \"site/**/*.html, site/**/*.css, dist/index.js\""
+    "serve:site": "browser-sync start --server --startPath /site/ --files \"site/**/*.html, site/**/*.css, dist/index.js\"",
+    "sass:watch": "sass site/:site/ --no-source-map --watch",
+    "sass:build": "sass site/:site/ --no-source-map"
   },
   "bin": {
     "webaudiofont": "./bin/cli.js"
@@ -43,6 +57,10 @@
   },
   "devDependencies": {
     "browser-sync": "^3.0.4",
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.0",
+    "sass": "^1.99.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

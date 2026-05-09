@@ -20,7 +20,7 @@ var MidiAudioPlayer = (() => {
   // index.js
   var index_exports = {};
   __export(index_exports, {
-    default: () => MidiAudioPlayer
+    default: () => index_default
   });
 
   // node_modules/midi-player-js/build/index.browser.js
@@ -1607,6 +1607,10 @@ var MidiAudioPlayer = (() => {
       await this.loadArrayBuffer(content);
     }
   };
+
+  // index.js
+  window.MidiAudioPlayer = MidiAudioPlayer;
+  var index_default = MidiAudioPlayer;
   return __toCommonJS(index_exports);
 })();
 //# sourceMappingURL=midi-audio-player.js.map

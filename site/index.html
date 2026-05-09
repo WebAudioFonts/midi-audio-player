@@ -4,11 +4,11 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link rel="icon" type="image/png" href="./images/favicon.png">
-	<link rel="stylesheet" href="./styles/styles.css">
 	<link rel="stylesheet" href="./styles/hopscotch.min.css">
+	<link rel="stylesheet" href="./styles/styles.css">
 	<script src="./scripts/highlight.min.js"></script>
 	<script src="./scripts/marked.umd.js"></script>
-	<title>MidiAudioPlayer</title>
+	<title>MidiAudioPlayer | JavaScript MIDI audio player</title>
 </head>
 <body>
 	<header>
@@ -30,7 +30,6 @@
 				<li>Simple programmatic API</li>
 				<li>CLI tool for preset/font handling</li>
 			</ul>
-
 		</section>
 
 		<section>
@@ -102,10 +101,19 @@
 			<p><a noreferrer noopener target="_blank"  href="https://github.com/ZmotriN/midi-audio-player">https://github.com/ZmotriN/midi-audio-player</a></p>
 		</section>
 
-		<section id="changelog">
-			
+		<section id="changelog"></section>
+
+		<hr>
+
+		<section>
+			<h2>Examples</h2>
 		</section>
 
+		<hr>
+
+		<section>
+			<h2>Documentation</h2>
+		</section>
 	</main>
 
 	
@@ -115,10 +123,8 @@
 			hljs.highlightAll();
 			const response = await fetch('https://raw.githubusercontent.com/ZmotriN/midi-audio-player/refs/heads/main/CHANGELOG.md');
 			const changelog = await marked.parse(await response.text());
-			document.getElementById('changelog').innerHTML = `<h2>Changelog</h2>${changelog}`;
+			document.getElementById('changelog').innerHTML = changelog;
 		})();
-
-
 	</script>
 </body>
 </html>

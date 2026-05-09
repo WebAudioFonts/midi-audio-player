@@ -1,1 +1,3 @@
-export { default } from './src/midiaudioplayer.js';
+import { MidiAudioPlayer } from './src/midiaudioplayer.js';
+window.MidiAudioPlayer = MidiAudioPlayer;
+export default MidiAudioPlayer;
