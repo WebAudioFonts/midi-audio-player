@@ -1,5 +1,5 @@
 (async () => {
-	
+
 	const song = 'https://zmotrin.github.io/midi-audio-player/data/iwillsurvive.mid';
 	const btnplay = document.querySelector('.btn.play');
 	const btnstop = document.querySelector('.btn.stop')
@@ -7,7 +7,7 @@
 	const logs = document.querySelector('.logs');
 
 
-	const log = (str) => {
+	const log = async (str) => {
 		const now = new Date();
 		const formatted = new Intl.DateTimeFormat('en-CA', {
 			hour: '2-digit',
@@ -22,14 +22,18 @@
 
 
 	btnplay.addEventListener('click', () => {
-		[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
+		[btnpause, btnstop].forEach(btn => {
+			btn.classList.remove('active');
+		});
 		btnplay.classList.add('active');
 		player.play();
 		log(player.getCurrentTick() ? "Resume" : "Play");
 	});
 
 	btnstop.addEventListener('click', () => {
-		[btnpause, btnplay].forEach(btn => btn.classList.remove('active'));
+		[btnpause, btnplay].forEach(btn => {
+			btn.classList.remove('active');
+		});
 		btnstop.classList.add('active');
 		player.stop();
 		log("Stop");
@@ -37,7 +41,9 @@
 
 	btnpause.addEventListener('click', () => {
 		if(!player.isPlaying()) return log("Not playing");
-		[btnstop, btnplay].forEach(btn => btn.classList.remove('active'));
+		[btnstop, btnplay].forEach(btn => {
+			btn.classList.remove('active');
+		});
 		btnpause.classList.add('active');
 		player.pause();
 		log("Pause");
