@@ -29,9 +29,15 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         });
 	}
 
+    async load(content) {
+		if(this.isPlaying()) this.stop();
+		this.#clearActiveNotes();
+		await this.loadArrayBuffer(content);
+	}
+    
 
 	async play(content = null) {
-		if(content) await this.#load(content);
+		if(content) await this.load(content);
         await this.#audioCtx.resume();
 		await super.play();
 	}
@@ -97,13 +103,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             this.#activeNotes.clear();
         }
     }
-
-
-	async #load(content) {
-		if(this.isPlaying()) this.stop();
-		this.#clearActiveNotes();
-		await this.loadArrayBuffer(content);
-	}
 
 }
 

@@ -4,9 +4,10 @@
   --color-main: #ffa48d;
   --color-second: #fd3c84;
   --color-third: #06b6d4;
-  --color-hljs1: #696068;
+  --color-pre: #322931;
+  --color-hljs1: #776C75;
   --color-hljs2: #5c545b;
-  --color-hljs3: #4F484E;
+  --color-hljs3: #413C41;
   --color-bg1: #192339;
   --color-bg2: #111827;
   --color-bg3: #090D15;
@@ -138,41 +139,59 @@ hr {
   background: var(--color-third);
 }
 
-pre code.hljs {
+pre code.hljs, .logs {
   font-size: 0.7rem;
   font-family: var(--font-monospace);
   overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--color-hljs2) var(--color-hljs3);
 }
-pre code.hljs::-webkit-scrollbar {
+pre code.hljs::-webkit-scrollbar, .logs::-webkit-scrollbar {
   height: 0.2rem;
 }
-pre code.hljs::-webkit-scrollbar-track {
+pre code.hljs::-webkit-scrollbar-track, .logs::-webkit-scrollbar-track {
   background: var(--color-hljs3);
   border-radius: 0.1rem;
 }
-pre code.hljs::-webkit-scrollbar-thumb {
+pre code.hljs::-webkit-scrollbar-thumb, .logs::-webkit-scrollbar-thumb {
   background-color: var(--color-hljs2);
   border-radius: 0.1rem;
   border: 0.05rem solid var(--color-hljs3);
 }
-pre code.hljs::-webkit-scrollbar-thumb:hover {
+pre code.hljs::-webkit-scrollbar-thumb:hover, .logs::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-hljs1);
+}
+
+section:has(.controls) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  row-gap: 2rem;
 }
 
 .controls {
   position: relative;
   display: flex;
   flex-direction: row;
-  column-gap: 1rem;
-  justify-content: center;
+  justify-content: space-between;
   user-select: none;
+  height: 8rem;
+  width: 80%;
+}
+
+.logs {
+  background-color: var(--color-pre);
+  width: 80%;
+  height: 9.1rem;
+  padding: 0.5rem;
+  line-height: 1.2rem;
+  white-space: pre-wrap;
 }
 
 .btn {
   position: relative;
-  width: 5rem;
+  height: 100%;
   aspect-ratio: 1/1;
   background-position: center;
   background-size: contain;

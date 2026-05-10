@@ -26,6 +26,7 @@ $color-second: #fd3c84;
 $color-third:  #06b6d4;
 $color-hljs:   #5c545b;
 $color-bg:     #111827;
+$color-pre:    #322931; 
 
 
 :root {
@@ -33,10 +34,11 @@ $color-bg:     #111827;
 	--color-main:       #{$color-main};
 	--color-second:     #{$color-second};
 	--color-third:      #{$color-third};
+	--color-pre:        #{$color-pre};
   
-	--color-hljs1:      #{hex-adjust($color-hljs, 5%)};
+	--color-hljs1:      #{hex-adjust($color-hljs, 10%)};
 	--color-hljs2:      #{$color-hljs};
-	--color-hljs3:      #{hex-adjust($color-hljs, -5%)};
+	--color-hljs3:      #{hex-adjust($color-hljs, -10%)};
   
 	--color-bg1:        #{hex-adjust($color-bg, 5%)};
 	--color-bg2:        #{$color-bg};
@@ -109,6 +111,7 @@ main {
 	row-gap: 2rem;
 }
 
+
 h1 {
 	opacity: 0;
 }
@@ -176,7 +179,7 @@ hr {
 	background: var(--color-third);
 }
 
-pre code.hljs {
+pre code.hljs, .logs {
 	font-size: 0.7rem;
 	font-family: var(--font-monospace);
 	overflow-x: auto;
@@ -201,32 +204,45 @@ pre code.hljs {
 	&::-webkit-scrollbar-thumb:hover {
 		background-color: var(--color-hljs1)
 	}
-
 }
 
+
+section:has(.controls) {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex-direction: column;
+	row-gap: 2rem;
+}
 
 .controls {
 	position: relative;
 	display: flex;
 	flex-direction: row;
-	column-gap: 1rem;
-	justify-content: center;
+	justify-content: space-between;
 	user-select: none;
+	height: 8rem;
+	width: 80%;
 }
 
+.logs {
+	background-color: var(--color-pre);
+	width: 80%;
+	height: 9.1rem;
+	padding: 0.5rem;
+	line-height: 1.2rem;
+	white-space: pre-wrap;
+}
 
 .btn {
 	position: relative;
-	width: 5rem;
+	height: 100%;
 	aspect-ratio: 1 / 1;
-
 	background-position: center;
 	background-size: contain;
 	background-repeat: no-repeat;
-
 	border-radius: 100%;
 	opacity: 0.6;
-
 	cursor: pointer;
 
 	&:hover, &.active {

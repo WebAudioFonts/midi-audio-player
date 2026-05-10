@@ -7,8 +7,8 @@
 	██████╔╝██║██║  ██║██║ ╚═╝ ██║███████╗   ██║   ██║  ██║██║╚██████╗██║  ██╗
 	╚═════╝ ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝ ╚═════╝╚═╝  ╚═╝	
 
-	Version: 1.1.2
-	Généré:  2026-05-09 20:45:40
+	Version: 1.1.3
+	Généré:  2026-05-10 01:11:19
 	Auteur:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/ZmotriN/midi-audio-player/
 	Website: https://zmotrin.github.io/midi-audio-player/
@@ -1539,8 +1539,13 @@
         await this.#endOfFile();
       });
     }
+    async load(content) {
+      if (this.isPlaying()) this.stop();
+      this.#clearActiveNotes();
+      await this.loadArrayBuffer(content);
+    }
     async play(content = null) {
-      if (content) await this.#load(content);
+      if (content) await this.load(content);
       await this.#audioCtx.resume();
       await super.play();
     }
@@ -1592,11 +1597,6 @@
         });
         this.#activeNotes.clear();
       }
-    }
-    async #load(content) {
-      if (this.isPlaying()) this.stop();
-      this.#clearActiveNotes();
-      await this.loadArrayBuffer(content);
     }
   };
 
