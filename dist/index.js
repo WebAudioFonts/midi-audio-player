@@ -1603,38 +1603,70 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
   static PIANO = 1;
   static BASS = 2;
   static STRINGS = 3;
-  static SYNTH = 4;
+  static GUITAR = 4;
   static DRUM = 10;
   #catalog = null;
   #audioCtx = null;
   #activeNotes = null;
   #players = {
-    1: null,
-    2: null,
-    3: null,
-    4: null,
-    10: null
+    [_MidiAudioPlayer.PIANO]: null,
+    [_MidiAudioPlayer.BASS]: null,
+    [_MidiAudioPlayer.STRINGS]: null,
+    [_MidiAudioPlayer.GUITAR]: null,
+    [_MidiAudioPlayer.DRUM]: null
   };
-  #presets = {
-    1: null,
-    2: null,
-    3: null,
-    4: null,
-    10: null
+  #actives = {
+    [_MidiAudioPlayer.PIANO]: true,
+    [_MidiAudioPlayer.BASS]: true,
+    [_MidiAudioPlayer.STRINGS]: true,
+    [_MidiAudioPlayer.GUITAR]: true,
+    [_MidiAudioPlayer.DRUM]: true
   };
+  // #channels = {
+  //     "piano":   [MidiAudioPlayer.PIANO],
+  //     "bass":    [MidiAudioPlayer.BASS],
+  //     "strings": [MidiAudioPlayer.STRINGS],
+  //     "guitar":  [MidiAudioPlayer.GUITAR],
+  //     "drum":    [MidiAudioPlayer.DRUM],
+  // };
   #opts = {
-    preset: defaultpreset_default,
+    // preset: DefaultPreset,
     volume: 0.5,
     onEndFile: null,
     localCache: true,
-    presets: null
+    // fillDefault: false,
+    activeChannels: {
+      [_MidiAudioPlayer.PIANO]: true,
+      [_MidiAudioPlayer.BASS]: true,
+      [_MidiAudioPlayer.STRINGS]: true,
+      [_MidiAudioPlayer.GUITAR]: true,
+      [_MidiAudioPlayer.DRUM]: true
+    },
+    presets: {
+      [_MidiAudioPlayer.PIANO]: defaultpreset_default,
+      [_MidiAudioPlayer.BASS]: defaultpreset_default,
+      [_MidiAudioPlayer.STRINGS]: defaultpreset_default,
+      [_MidiAudioPlayer.GUITAR]: defaultpreset_default,
+      [_MidiAudioPlayer.DRUM]: defaultpreset_default
+    }
   };
   constructor(opts = {}) {
     super((event) => this.#handleMidiPipeline(event));
-    this.#opts = { ...this.#opts, ...opts };
+    this.#opts = {
+      ...this.#opts,
+      ...opts,
+      activeChannels: {
+        ...this.#opts.activeChannels || {},
+        ...opts.activeChannels || {}
+      },
+      presets: {
+        ...this.#opts.presets || {},
+        ...opts.presets || {}
+      }
+    };
     this.#activeNotes = /* @__PURE__ */ new Map();
     this.#audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    Object.keys(this.#players).forEach((k) => this.#players[k] = new WebAudioFontPlayer(this.#audioCtx, this.#opts.preset));
+    Object.keys(this.#players).forEach((k) => this.#players[k] = new WebAudioFontPlayer(this.#audioCtx, this.#opts.presets[k]));
     this.on("endOfFile", async () => {
       await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 1)));
       await this.#endOfFile();
@@ -1652,8 +1684,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     return this.#catalog;
   }
   async getCategories() {
-    const catalog = await this.getCatalog();
-    return catalog.categories;
+    return (await this.getCatalog()).categories;
   }
   async getPreset(id) {
     const cacheid = `waf_preset_${id}`;
@@ -1663,6 +1694,11 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     const preset = await response.json();
     if (this.#opts.localCache) await indexeddbstorage_default.setItem(cacheid, JSON.stringify(preset));
     return preset;
+  }
+  async loadPreset(id) {
+    const preset = await this.getPreset(id);
+    const player = new WebAudioFontPlayer(this.#audioCtx, preset);
+    this.#players[preset.channel] = player;
   }
   async load(content) {
     if (this.isPlaying()) this.stop();
@@ -1684,6 +1720,10 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     await this.#clearActiveNotes();
     await Promise.all(Object.keys(this.#players).map(async (k) => await this.#players[k]?.cancelQueue()));
   }
+  setActiveChannel(channel, value) {
+    this.#opts.activeChannels[channel] = value;
+    if (!value) this.#clearChannel(channel);
+  }
   async #endOfFile() {
     if (typeof this.#opts.onEndFile == "function") await this.#opts.onEndFile();
   }
@@ -1693,7 +1733,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     if (event.noteNumber === void 0) return;
     switch (event.name) {
       case "Note on":
-        console.log(event);
+        if (!this.#opts.activeChannels[event.channel]) break;
         if (event.velocity > 0 && event.velocity <= 127) {
           this.#stopNotePipe(event.noteNumber);
           const normalizedMaster = this.#opts.volume * 100 / 256;
@@ -1701,7 +1741,10 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
           const noteVelocityRatio = event.velocity / 127;
           const finalVol = masterGain * Math.pow(noteVelocityRatio, 2);
           const envelope = this.#players[event.channel]?.queueWaveTable(0, event.noteNumber, 2, finalVol);
-          this.#activeNotes.set(event.noteNumber, envelope);
+          if (envelope) {
+            envelope.channel = event.channel;
+            this.#activeNotes.set(event.noteNumber, envelope);
+          }
         } else {
           this.#stopNotePipe(event.noteNumber);
         }
@@ -1709,6 +1752,16 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
       case "Note off":
         this.#stopNotePipe(event.noteNumber);
         break;
+    }
+  }
+  #clearChannel(channel) {
+    if (this.#activeNotes) {
+      this.#activeNotes.forEach((envelope, note) => {
+        if (envelope && envelope.cancel && envelope.channel == channel) {
+          envelope.cancel();
+          this.#activeNotes.delete(note);
+        }
+      });
     }
   }
   #stopNotePipe(noteNumber) {
