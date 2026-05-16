@@ -307,6 +307,60 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     }
 
 
+    ticksToSeconds(startTick, endTick) {
+        if (startTick >= endTick) return 0;
+        let seconds = 0;
+        const len = this.tempoMap.length;
+        const timeFactor = 60 / this.division;
+        let low = 0;
+        let high = len - 1;
+        let startIndex = 0;
+        while (low <= high) {
+            const mid = (low + high) >> 1;
+            if (this.tempoMap[mid].tick <= startTick) {
+                startIndex = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        let currentTick = startTick;
+        for (let i = startIndex; i < len; i++) {
+            const entry = this.tempoMap[i];
+            const nextTick = (i + 1 < len) ? this.tempoMap[i + 1].tick : endTick;
+            if (nextTick <= startTick) continue;
+            const segStart = Math.max(entry.tick, startTick);
+            const segEnd = Math.min(nextTick, endTick);
+            if (segStart >= endTick) break;
+            seconds += ((segEnd - segStart) / entry.tempo) * timeFactor;
+            currentTick = segEnd;
+        }
+        if (currentTick < endTick) {
+            const lastEntry = this.tempoMap[len - 1];
+            seconds += ((endTick - currentTick) / lastEntry.tempo) * timeFactor;
+        }
+        return seconds;
+    }
+
+
+    secondsToTicks(seconds) {
+        let remainingSeconds = seconds;
+        const len = this.tempoMap.length;
+        const factor = 60 / this.division;
+        for (let i = 0; i < len; i++) {
+            const entry = this.tempoMap[i];
+            const nextTick = (i + 1 < len) ? this.tempoMap[i + 1].tick : Infinity;
+            const segmentTicks = nextTick - entry.tick;
+            const segmentSeconds = (segmentTicks / entry.tempo) * factor;
+            if (remainingSeconds <= segmentSeconds) {
+                return entry.tick + Math.round((remainingSeconds * entry.tempo) / factor);
+            }
+            remainingSeconds -= segmentSeconds;
+        }
+        return this.totalTicks;
+    }
+
+
     async getProgramInstruments(program) {
         const categories = await this.getCategories();
         let instruments = [];
