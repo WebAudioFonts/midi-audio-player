@@ -1301,13 +1301,15 @@ var WebAudioFontPlayer = class {
   }
   setPitchBend(value) {
     this.#pitchBendValue = value;
-    const semitones = (value - 8192) / 8192 * this.#bendRange;
+    const normalized = value - 8192;
+    const semitones = normalized >= 0 ? normalized / 8191 * this.#bendRange : normalized / 8192 * this.#bendRange;
     const now = this.#audioCtx.currentTime;
     this.#envelopes.forEach((e) => {
       if (e.audioBufferSourceNode && e.when + e.duration > now) {
         const originalPitch = e.pitch;
         const baseDetune = e.baseDetune;
-        const newRate = Math.pow(2, (100 * (originalPitch + semitones) - baseDetune) / 1200);
+        const totalCents = originalPitch * 100 - baseDetune + semitones * 100;
+        const newRate = Math.pow(2, totalCents / 1200);
         e.audioBufferSourceNode.playbackRate.setTargetAtTime(newRate, now, 0.05);
       }
     });
