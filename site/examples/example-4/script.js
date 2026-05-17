@@ -23,7 +23,7 @@ class DNDZone {
 
 	container = null;
 	opts = { onFileDrop: null };
-	
+
 	constructor(container, opts = {}) {
 		this.opts = { ...this.opts, ...opts };
 		if(typeof container != 'string') this.container = container;
@@ -117,10 +117,10 @@ class programChooser {
 
 
 (async () => {
-	// const song = '../../data/closer.mid';
-	const song = '../../data/screw.kar';
+	const song = '../../data/closer.mid';
+	// const song = '../../data/screw.kar';
 
-	
+
 
 	const logs = document.querySelector('.logs');
 	const btnplay = document.querySelector('.btn.play');
@@ -193,6 +193,7 @@ class programChooser {
 		localCache: true,
 		karaoke: true,
 		muteExpression: false,
+		trimSilences: true,
 		preferred: ["JCLive", "LesPaul", "Chaos"],
 		// presets: { [-1]: '12805_Chaos' }
 	});
@@ -215,8 +216,8 @@ class programChooser {
 		// console.log(await player.extractLyrics());
 	});
 	player.on('logs', str => log(str));
-	player.on('karaoke', text => {
-		document.querySelector('section > div.karaoke').innerHTML = `<p>${text}</p>`;
+	player.on('karaoke', evt => {
+		document.querySelector('section > div.karaoke').innerHTML = `<p>${evt.html}</p>`;
 	});
 	player.on('channelState', async channels => {
 		Object.keys(channels).map(async channel => programs[channel].setActive(channels[channel]));
@@ -226,12 +227,11 @@ class programChooser {
 		const x = event.clientX - rect.left;
 		const ratio = x / rect.width;
 		const finalRatio = Math.max(0, Math.min(1, ratio));
-		await player.skipToTick(songInfos.totalTicks * finalRatio);
+		await player.skipToSeconds(songInfos.duration * finalRatio);
 		[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
 		btnplay.classList.add('active');
 		player.play();
 	});
-console.log(document.querySelector('.dnd'));
 
 	new DNDZone(document.querySelector('.dnd'), { onFileDrop: async file => {
 		if(!['mid', 'midi', 'kar'].includes(file.name.split('.').pop()?.toLowerCase()) || !file.size || file.size > 5242880) {
@@ -324,7 +324,20 @@ console.log(document.querySelector('.dnd'));
 	await loadPrograms(channels, presets);
 
 
-	log("Ready: Drag & drop your files here");
+	
+	// log("----------------------------------------");
+	// log("██████╗ ███████╗ █████╗ ██████╗ ██╗   ██╗");
+	// log("██╔══██╗██╔════╝██╔══██╗██╔══██╗╚██╗ ██╔╝");
+	// log("██████╔╝█████╗  ███████║██║  ██║ ╚████╔╝");
+	// log("██╔══██╗██╔══╝  ██╔══██║██║  ██║  ╚██╔╝");
+	// log("██║  ██║███████╗██║  ██║██████╔╝   ██║");
+	// log("╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝");
+	log("----------------------------------------");
+	log("      Drag & drop your files here");
+	log("----------------------------------------");
+
+
+
 	document.querySelector('.controls').classList.remove('disabled');
 	document.querySelector('.waveform').classList.remove('disabled');
 	document.querySelector('.programs').classList.remove('disabled');

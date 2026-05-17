@@ -4,7 +4,7 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&display=block');
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=block');
-
+// @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=block');
 
 @function hexbin($c) {
 	@return string.to-lower-case(string.unquote('#{string.slice(ie-hex-str($c), 4)}'));
@@ -526,15 +526,18 @@ section:has(.controls) {
 
 
 .logs {
+	// font-family: monospace, var(--font-monospace);
 	background-color: var(--color-pre);
 	width: 80%;
 	height: 9.1rem;
 	padding: 0.5rem;
-	line-height: 1.2rem;
+	line-height: 1.01rem;
 	white-space: pre-wrap;
 	border-radius: 0.2rem;
-	pointer-events: none;
-	user-select: none;
+	font-variant-numeric: tabular-nums lining-nums;
+    font-kerning: none;
+    text-rendering: optimizeSpeed;
+    white-space: pre;
 }
 
 .btn {

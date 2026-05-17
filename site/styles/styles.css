@@ -428,11 +428,13 @@ section:has(.controls) {
   width: 80%;
   height: 9.1rem;
   padding: 0.5rem;
-  line-height: 1.2rem;
+  line-height: 1.01rem;
   white-space: pre-wrap;
   border-radius: 0.2rem;
-  pointer-events: none;
-  user-select: none;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-kerning: none;
+  text-rendering: optimizeSpeed;
+  white-space: pre;
 }
 
 .btn {
