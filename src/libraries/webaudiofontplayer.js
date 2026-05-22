@@ -23,14 +23,12 @@ export default class WebAudioFontPlayer {
         this.#audioCtx = audioCtx;
         this.#compressor = compressor;
         this.#preset = preset;
-
         this.#mainGain = this.#audioCtx.createGain();
         this.#mainGain.gain.setValueAtTime(this.#volumeValue, this.#audioCtx.currentTime);
         this.#expressionGain = this.#audioCtx.createGain();
         this.#expressionGain.gain.setValueAtTime(this.#expressionValue, this.#audioCtx.currentTime);
         this.#mainGain.connect(this.#expressionGain);
         this.#expressionGain.connect(this.#compressor.input);
-
         this.#preset.zones.map(zone => this.#adjustZone(zone));
     }
 
@@ -188,19 +186,8 @@ export default class WebAudioFontPlayer {
     #adjustZone(zone) {
         if (zone.buffer) return Promise.resolve(zone);
         zone.delay = 0;
-        if (zone.sample) {
-            const binaryString = atob(zone.sample);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-            const int16Samples = new Int16Array(bytes.buffer);
-            const numSamples = int16Samples.length;
-            zone.buffer = this.#audioCtx.createBuffer(1, numSamples, zone.sampleRate);
-            const float32Array = zone.buffer.getChannelData(0);
-            for (let i = 0; i < numSamples; i++) float32Array[i] = int16Samples[i] / 32768.0;
-            this.#applyZoneParameters(zone);
-            return zone;
-        } else if (zone.file) {
+
+        if (zone.file) {
             const decoded = atob(zone.file);
             const uint8Array = new Uint8Array(decoded.length);
             for (let i = 0; i < decoded.length; i++) uint8Array[i] = decoded.charCodeAt(i);
@@ -230,7 +217,7 @@ export default class WebAudioFontPlayer {
         zone.coarseTune = this.#numValue(zone.coarseTune, 0);
         zone.fineTune = this.#numValue(zone.fineTune, 0);
         zone.originalPitch = this.#numValue(zone.originalPitch, 6000);
-        zone.sampleRate = this.#numValue(zone.sampleRate, 44100);
+        // zone.sampleRate = this.#numValue(zone.sampleRate, this.#preset.sampleRate);
     };
 
 

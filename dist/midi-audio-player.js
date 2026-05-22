@@ -8,7 +8,7 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 1.2.0
-	Généré:  2026-05-17 00:05:46
+	Généré:  2026-05-21 15:44:30
 	Auteur:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/ZmotriN/midi-audio-player/
 	Website: https://zmotrin.github.io/midi-audio-player/
@@ -1383,19 +1383,7 @@
     #adjustZone(zone) {
       if (zone.buffer) return Promise.resolve(zone);
       zone.delay = 0;
-      if (zone.sample) {
-        const binaryString = atob(zone.sample);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-        const int16Samples = new Int16Array(bytes.buffer);
-        const numSamples = int16Samples.length;
-        zone.buffer = this.#audioCtx.createBuffer(1, numSamples, zone.sampleRate);
-        const float32Array = zone.buffer.getChannelData(0);
-        for (let i = 0; i < numSamples; i++) float32Array[i] = int16Samples[i] / 32768;
-        this.#applyZoneParameters(zone);
-        return zone;
-      } else if (zone.file) {
+      if (zone.file) {
         const decoded = atob(zone.file);
         const uint8Array = new Uint8Array(decoded.length);
         for (let i = 0; i < decoded.length; i++) uint8Array[i] = decoded.charCodeAt(i);
@@ -1423,7 +1411,6 @@
       zone.coarseTune = this.#numValue(zone.coarseTune, 0);
       zone.fineTune = this.#numValue(zone.fineTune, 0);
       zone.originalPitch = this.#numValue(zone.originalPitch, 6e3);
-      zone.sampleRate = this.#numValue(zone.sampleRate, 44100);
     }
     #setupEnvelope(envelope, zone, volume, when, sampleDuration, noteDuration) {
       envelope.gain.setValueAtTime(this.#nearZero, this.#audioCtx.currentTime);
@@ -1525,7 +1512,7 @@
   };
 
   // src/libraries/audiocompressor.js
-  var AudioCompressor = class {
+  var AudioCompressor = class _AudioCompressor {
     #input = null;
     #output = null;
     #audioCtx = null;
@@ -1534,6 +1521,23 @@
     #reverbNode = null;
     #reverbWet = null;
     #currentReverbLevel = 0;
+    // EQ — map de fréquence → { filter, gain courant }
+    #eqBands = /* @__PURE__ */ new Map();
+    static #EQ_FREQUENCIES = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
+    // Q par bande : large dans les basses, serré dans les aigus
+    // Donne une courbe ronde et musicale sans artefacts de phase
+    static #EQ_Q = /* @__PURE__ */ new Map([
+      [32, 0.7],
+      [64, 0.8],
+      [128, 0.9],
+      [256, 1],
+      [512, 1.1],
+      [1024, 1.2],
+      [2048, 1.4],
+      [4096, 1.6],
+      [8192, 1.8],
+      [16384, 2]
+    ]);
     constructor(audioCtx, volume, reverb) {
       this.#audioCtx = audioCtx;
       this.#input = this.#audioCtx.createGain();
@@ -1557,7 +1561,7 @@
       this.#limiter.knee.setValueAtTime(0, this.#audioCtx.currentTime);
       this.#analyser = this.#audioCtx.createAnalyser();
       this.#analyser.fftSize = 256;
-      this.#analyser.smoothingTimeConstant = 0.4;
+      this.#analyser.smoothingTimeConstant = 0.6;
       this.#output = this.#audioCtx.createGain();
       this.#output.gain.setValueAtTime(volume, this.#audioCtx.currentTime);
       lastNode.connect(this.#output);
@@ -1597,12 +1601,134 @@
     restoreReverb() {
       this.reverb = this.#currentReverbLevel;
     }
+    /**
+     * Applique des gains EQ avec interpolation Bézier cubique entre les bandes.
+     *
+     * @param {Object} gains  Clés = fréquences Hz (parmi les 10 bandes),
+     *                        valeurs = gain en dB [-12 .. +12].
+     *                        Les bandes non spécifiées gardent leur valeur courante.
+     * @param {number} [smoothTime=0.04]  Constante de lissage WebAudio (secondes).
+     *
+     * @example
+     * // Preset "Basses boostées"
+     * eq.setEQ({ 32: 6, 64: 4, 128: 2, 256: 0, 16384: 1 });
+     *
+     * // Preset "Smiley face"
+     * eq.setEQ({ 32: 5, 64: 3, 256: -2, 1024: -4, 2048: -2, 8192: 3, 16384: 5 });
+     */
+    setEQ(gains, smoothTime = 0.04) {
+      const freqs = _AudioCompressor.#EQ_FREQUENCIES;
+      const now = this.#audioCtx.currentTime;
+      const MAX_DB = 12;
+      const targetGains = /* @__PURE__ */ new Map();
+      for (const freq of freqs) {
+        const band = this.#eqBands.get(freq);
+        targetGains.set(freq, band.gain);
+      }
+      for (const [key, val] of Object.entries(gains)) {
+        const freq = Number(key);
+        if (this.#eqBands.has(freq)) {
+          targetGains.set(freq, Math.max(-MAX_DB, Math.min(MAX_DB, val)));
+        }
+      }
+      const smoothedGains = this.#catmullRomSmooth(freqs, targetGains);
+      for (const freq of freqs) {
+        const band = this.#eqBands.get(freq);
+        const dbValue = smoothedGains.get(freq);
+        band.filter.gain.setTargetAtTime(dbValue, now, smoothTime);
+        band.gain = dbValue;
+      }
+    }
+    /**
+     * Retourne l'état courant de l'EQ.
+     * @returns {Object}  { 32: dB, 64: dB, … 16384: dB }
+     */
+    getEQ() {
+      const result = {};
+      for (const [freq, band] of this.#eqBands) {
+        result[freq] = band.gain;
+      }
+      return result;
+    }
+    /**
+     * Remet toutes les bandes à 0 dB.
+     * @param {number} [smoothTime=0.04]
+     */
+    resetEQ(smoothTime = 0.04) {
+      const flat = {};
+      for (const freq of _AudioCompressor.#EQ_FREQUENCIES) flat[freq] = 0;
+      this.setEQ(flat, smoothTime);
+    }
+    /**
+     * Applique un preset nommé.
+     * @param {'flat'|'bass'|'treble'|'vocal'|'loudness'|'classical'|'jazz'|'electronic'} name
+     */
+    setEQPreset(name) {
+      const presets = {
+        flat: { 32: 0, 64: 0, 128: 0, 256: 0, 512: 0, 1024: 0, 2048: 0, 4096: 0, 8192: 0, 16384: 0 },
+        bass: { 32: 7, 64: 6, 128: 4, 256: 2, 512: 0, 1024: -1, 2048: -1, 4096: 0, 8192: 0, 16384: 0 },
+        treble: { 32: 0, 64: 0, 128: 0, 256: 0, 512: 0, 1024: 1, 2048: 3, 4096: 5, 8192: 7, 16384: 8 },
+        vocal: { 32: -3, 64: -2, 128: 0, 256: 2, 512: 4, 1024: 5, 2048: 4, 4096: 2, 8192: 1, 16384: 0 },
+        loudness: { 32: 6, 64: 4, 128: 1, 256: 0, 512: -1, 1024: -1, 2048: 0, 4096: 2, 8192: 4, 16384: 5 },
+        classical: { 32: 4, 64: 3, 128: 2, 256: 0, 512: 0, 1024: 0, 2048: 0, 4096: 2, 8192: 3, 16384: 4 },
+        jazz: { 32: 4, 64: 3, 128: 1, 256: 0, 512: -1, 1024: -1, 2048: 0, 4096: 1, 8192: 3, 16384: 4 },
+        electronic: { 32: 6, 64: 5, 128: 2, 256: -1, 512: -2, 1024: -1, 2048: 2, 4096: 4, 8192: 5, 16384: 6 }
+      };
+      const preset = presets[name];
+      if (!preset) throw new Error(`Preset EQ inconnu : "${name}". Disponibles : ${Object.keys(presets).join(", ")}`);
+      this.setEQ(preset);
+    }
+    // ─── Interpolation Catmull-Rom (tangentes centrées) en log-espace ──────────
+    /**
+     * Lisse les gains cibles avec des splines Catmull-Rom en espace log-fréquence.
+     * Retourne une nouvelle Map freq→dB avec les mêmes clés.
+     * @private
+     */
+    #catmullRomSmooth(freqs, targetGains) {
+      const logFreqs = freqs.map((f) => Math.log2(f));
+      const gains = freqs.map((f) => targetGains.get(f));
+      const n = freqs.length;
+      const tangents = gains.map((_, i) => {
+        const prev = i > 0 ? gains[i - 1] : gains[i];
+        const next = i < n - 1 ? gains[i + 1] : gains[i];
+        const dx = i > 0 && i < n - 1 ? logFreqs[i + 1] - logFreqs[i - 1] : i === 0 ? logFreqs[1] - logFreqs[0] : logFreqs[n - 1] - logFreqs[n - 2];
+        return dx === 0 ? 0 : (next - prev) / dx;
+      });
+      const smoothed = /* @__PURE__ */ new Map();
+      for (let i = 0; i < n; i++) {
+        const seg = Math.min(i, n - 2);
+        const t = i === seg ? 0 : 1;
+        const g = this.#hermite(
+          gains[seg],
+          gains[seg + 1],
+          tangents[seg] * (logFreqs[seg + 1] - logFreqs[seg]),
+          tangents[seg + 1] * (logFreqs[seg + 1] - logFreqs[seg]),
+          t
+        );
+        smoothed.set(freqs[i], gains[i]);
+        void g;
+      }
+      for (let i = 1; i < n - 1; i++) {
+        const prev = smoothed.get(freqs[i - 1]);
+        const curr = smoothed.get(freqs[i]);
+        const next = smoothed.get(freqs[i + 1]);
+        smoothed.set(freqs[i], prev * (1 / 6) + curr * (4 / 6) + next * (1 / 6));
+      }
+      return smoothed;
+    }
+    /** Hermite cubique P(t) avec t ∈ [0,1] */
+    #hermite(p0, p1, m0, m1, t) {
+      const t2 = t * t, t3 = t2 * t;
+      return (2 * t3 - 3 * t2 + 1) * p0 + (t3 - 2 * t2 + t) * m0 + (-2 * t3 + 3 * t2) * p1 + (t3 - t2) * m1;
+    }
     #bandEqualizer(from, frequency) {
       const filter = this.#audioCtx.createBiquadFilter();
       filter.type = "peaking";
       filter.frequency.setValueAtTime(frequency, this.#audioCtx.currentTime);
       filter.gain.setValueAtTime(0, this.#audioCtx.currentTime);
-      filter.Q.setValueAtTime(1, this.#audioCtx.currentTime);
+      const q = _AudioCompressor.#EQ_Q.get(frequency) ?? 1;
+      filter.Q.setValueAtTime(q, this.#audioCtx.currentTime);
+      this.#eqBands.set(frequency, { filter, gain: 0 });
       from.connect(filter);
       return filter;
     }
@@ -1827,7 +1953,7 @@
   // src/midiaudioplayer.js
   var clamp = (num, min, max) => Math.min(Math.max(num, min), max);
   var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
-    static ENDPOINT = "https://zmotrin.github.io/webaudiofontjson/";
+    static ENDPOINT = "https://webaudiofonts.github.io/presets/";
     static DEFAULT_PRESET = -1;
     static REFERENCE_GAIN = 0.15;
     static KARAOKE_CHANNEL = 0;
@@ -1927,7 +2053,7 @@
         const cachedata = this.#opts.localCache ? await indexeddbstorage_default.getItem(cacheid) : null;
         if (cachedata) return JSON.parse(cachedata);
         this.#log(`Downloading preset ${id}...`);
-        const response = await fetch(`${_MidiAudioPlayer.ENDPOINT}presets/${id}.json`);
+        const response = await fetch(`${_MidiAudioPlayer.ENDPOINT}${id}.json`);
         const preset = await response.json();
         if (preset.zones === void 0) {
           console.error(`Invalid preset: ${$id}`);
@@ -1940,6 +2066,12 @@
         throw new Error(`Invalid preset: ${id}`);
       }
     }
+    async loadPreset(presetId, channel = null) {
+      const preset = await this.getPreset(presetId);
+      if (channel !== null) {
+        this.#players[channel].preset = preset;
+      }
+    }
     async load(content) {
       if (this.isPlaying()) this.stop();
       this.#clearActiveNotes();
@@ -1950,22 +2082,13 @@
       this.#title = "";
       this.#log("Loading buffer...");
       await this.loadArrayBuffer(content);
-      if (this.#opts.karaoke) {
-        this.#lyrics = null;
-        await this.#generateKaraokeFrames();
-        if (this.#title) this.#sendKaraokeFrame("title", this.#title);
-      }
-      this.#trimMidiEvents();
-      await new Promise(requestAnimationFrame);
-      queueMicrotask(() => this.triggerPlayerEvent("computed"));
       this.#log("Loading instruments...");
-      this.#instruments = {};
       this.#channels = await this.#getInstruments();
       this.#channelStates = Object.keys(this.#channels).reduce((acc, key) => ({ ...acc, [key]: false }), {});
       const uniqueInstruments = await this.#getUniqueInstruments();
       if (!Object.values(this.#channels).length) this.#log("Error: no instrument found");
       if (this.#opts.presetRandom || this.#opts.presetAuto) await this.getCatalog();
-      await Promise.all([...uniqueInstruments].map(async (program) => {
+      const presets = Promise.all([...uniqueInstruments].map(async (program) => {
         let preset = null;
         if ((this.#opts.presetAuto || this.#opts.presetRandom) && this.#opts.presets[program] != _MidiAudioPlayer.DEFAULT_PRESET) preset = await this.getPreset(this.#opts.presets[program]);
         else if (this.#opts.presetRandom) preset = await this.#getRandomPreset(program);
@@ -1973,6 +2096,16 @@
         else preset = await this.getPreset(this.#opts.presets[program]);
         this.#instruments[program] = preset;
       }));
+      if (this.#opts.karaoke) {
+        this.#log("Generating karaoke frames...");
+        this.#lyrics = null;
+        await this.#generateKaraokeFrames();
+        if (this.#title) this.#sendKaraokeFrame("title", this.#title);
+      }
+      this.#log(`Trim midi events...`);
+      this.#trimMidiEvents();
+      queueMicrotask(() => this.triggerPlayerEvent("computed"));
+      await presets;
       await Promise.all(Object.keys(this.#channels).map(async (channel) => {
         if (this.#players[channel]) this.#players[channel].close();
         this.#players[channel] = await this.#createWebAudioFontPlayer(this.#instruments[this.#channels[channel]]);
@@ -2095,7 +2228,8 @@
       return `<svg class="midiaudioplayer-waveform" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>`;
     }
     async triggerPlayerEvent(playerEvent, data) {
-      if (playerEvent == "computed") {
+      if (playerEvent == "fileLoaded") return;
+      else if (playerEvent == "computed") {
         if (this.#opts.muteExpression) this.#vocalChannel = await this.#detectKaraokeVocalChannel();
         super.triggerPlayerEvent(playerEvent, {
           title: this.#title,
@@ -2496,7 +2630,6 @@
       }
     }
     #trimMidiEvents() {
-      this.#log(`Trim midi events...`);
       if (!this.events || this.events.length === 0) return;
       let firstNoteTick = Infinity;
       let lastNoteTick = 0;
@@ -2565,7 +2698,6 @@
       });
       this.events = trimmedEvents;
       this.totalTicks = lastNoteTick - firstNoteTick;
-      this.#lyrics = null;
       if (typeof this.computeTempoMap === "function") this.computeTempoMap();
     }
     async #extractLyrics() {
@@ -2718,7 +2850,6 @@
       return structure;
     }
     async #generateKaraokeFrames() {
-      this.#log("Extracting lyrics...");
       const lyrics = await this.#extractLyrics();
       if (!lyrics.paragraphs.length) {
         this.#haveLyrics = false;
@@ -2733,7 +2864,6 @@
         return;
       }
       this.#haveLyrics = true;
-      this.#log("Generating karaoke frames...");
       this.#title = lyrics.title;
       let lastFrameEnd = 0;
       const delayTicks = this.secondsToTicks(this.#opts.karaokeDelay);
@@ -2929,8 +3059,8 @@
         else queueMicrotask(() => this.triggerPlayerEvent("karaoke", { type, html }));
       }
     }
-    #log(str, err = false) {
-      queueMicrotask(() => this.triggerPlayerEvent("logs", str));
+    async #log(str, err = false) {
+      this.triggerPlayerEvent("logs", str);
     }
   };
 

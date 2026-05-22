@@ -81,7 +81,21 @@ $color-pre:    #322931;
 html {
 	font-size: var(--font-size);
 	font-family: Rubik;
+
+	&.is-busy,
+    &.is-busy * {
+        cursor: wait !important;
+        pointer-events: none !important;
+    }
+
+    &.is-working,
+    &.is-working * {
+        cursor: progress !important;
+        pointer-events: none !important;
+    }
 }
+
+
 
 body {
 	position: relative;
@@ -308,6 +322,12 @@ section:has(.controls) {
 		opacity: 0.7;
 	}
 
+	span {
+		display: inline-block;
+		transform-origin: center;
+		white-space: pre;
+	}
+
 	.karaoke-intro::before {
 		content: "Karaoke🎤";
 		font-size: 3rem;
@@ -327,8 +347,12 @@ section:has(.controls) {
 	}
 
 	.karaoke-playing {
+		position: relative;
 		color: var(--color-third);
-		// font-weight: 700;
+		transform: scale(1.15) translateY(-8%);
+		z-index: 10;
+		font-weight: 700;
+		text-shadow: 0 0 0.1rem black, 0 0 0.2rem black, 0 0 0.4rem black, 0 0 0.6rem black;
 	}
 
 }

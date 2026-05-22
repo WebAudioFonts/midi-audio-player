@@ -19,22 +19,6 @@ HTMLElement.prototype.create = function(tag, classname=null, content=null, attrs
 
 
 
-async function busy(promise) {
-	document.documentElement.classList.add('is-busy');	
-	const results = await Promise.allSettled(typeof promise == 'array' ? promise : [promise]);
-	document.documentElement.classList.remove('is-busy');
-	return typeof promise == 'array' ? results : results[0];
-}
-
-
-async function working(promise) {
-	document.documentElement.classList.add('is-working');	
-	const results = await Promise.allSettled(typeof promise == 'array' ? promise : [promise]);
-	document.documentElement.classList.remove('is-working');
-	return typeof promise == 'array' ? results : results[0];
-}
-
-
 class DNDZone {
 
 	container = null;
@@ -69,18 +53,6 @@ class DNDZone {
 }
 
 
-function escapeHTML(str) {
-	return str.replace(/[&<>"']/g, function (m) {
-		return {
-			'&': '&amp;',
-			'<': '&lt;',
-			'>': '&gt;',
-			'"': '&quot;',
-			"'": '&#39;'
-		}[m];
-	});
-}
-
 
 class programChooser {
 
@@ -91,8 +63,6 @@ class programChooser {
 	#light = null;
 	#active = false;
 	#currentAnimation = null;
-	#select = null;
-	#presetCallback = null;
 
 
 	constructor(parent, channel, presets, selpreset) {
@@ -101,34 +71,32 @@ class programChooser {
 		this.#selpreset = selpreset;
 		presets.forEach(preset => preset.name = `${preset.instrument} / ${preset.bank} #${preset.serie + 1}`);
 		this.#presets = presets.sort((a, b) => a.name.localeCompare(b.name));;
+		
 		try {
 			this.#create();
+
 		}
 		catch(e) {
 			console.log(this.#presets);
 		}
-	}
-
-	set presetCallback(val) {
-		this.#presetCallback = val;
+		
 	}
 
 
 	#create() {
 		const container = create('div', 'instrument');
-		this.#select = container.create('select');
-		this.#select.create('option', null, this.#presets[0].category, { disabled: true });
+		const select = container.create('select');
+		select.create('option', null, this.#presets[0].category, { disabled: true });
 		this.#presets.forEach(preset => {
-			this.#select.create('option', null, escapeHTML(preset.name), { value: preset.id });
+			select.create('option', null, preset.name, { value: preset.id });
 		});
-		this.#select.value = this.#selpreset;
-		this.#select.addEventListener('change', () => {
-			if(typeof this.#presetCallback === 'function') this.#presetCallback(this.#select.value, this.#channel);
-		});
+		select.value = this.#selpreset;
 
 		container.create('div', 'program', `#${this.#channel}`);
 		this.#light = container.create('div', 'light');
-		this.#parent.appendChild(container);
+		requestAnimationFrame(() => {
+			this.#parent.appendChild(container);
+		});
 		
 	}
 
@@ -180,22 +148,19 @@ class programChooser {
 			second: '2-digit',
 			hour12: false
 		}).format(now).replace(/,/g, '');
-		await new Promise(requestAnimationFrame);
 		if(logs.innerText) logs.innerText += "\n";
 		logs.innerText += `[${formatted}] ${str}`;
 		logs.scrollTop = logs.scrollHeight;
 	}
 
 
-	const loadPrograms = async (channels, presets, presetCallback) => {
+	const loadPrograms = async (channels, presets) => {
 		presets = {};
 		const parent = create('div', 'instruments');
 		await Promise.all(Object.keys(channels).map(async channel => presets[channels[channel].preset.program] = await player.getProgramInstruments(channels[channel].preset.program)));
 		await Promise.all(Object.keys(channels).map(async channel => {
 			programs[channel] = new programChooser(parent, channel, presets[channels[channel].preset.program], channels[channel].preset.id);
-			programs[channel].presetCallback = presetCallback;
 		}));
-		await new Promise(requestAnimationFrame);
 		document.querySelector('section.programs').replaceChildren(parent);
 	}
 
@@ -239,7 +204,6 @@ class programChooser {
 		preferred: ["JCLive", "LesPaul", "Chaos"],
 	});
 	player.on('endOfFile', async () => {
-		await new Promise(requestAnimationFrame);
 		[btnpause, btnplay].forEach(btn => btn.classList.remove('active'));
 		btnstop.classList.add('active');
 		waveform.style.setProperty('--progress', `0%`);
@@ -248,44 +212,18 @@ class programChooser {
 	});
 	player.on('computed', async (data) => {
 		const svgCode = await player.generateWaveformSVG();
-		await new Promise(requestAnimationFrame);
-		songInfos = data;
-		document.querySelector('section > div.karaoke').style.setProperty('--title', `"${songInfos.title}"`);
-		log("Generating waveform...");
-		waveform.style.setProperty('--progress', `0%`);
-		waveform.style.setProperty('--time', `"0:00"`);
-		waveform.style.setProperty('--duration', `"${formatTime(songInfos.duration)}"`);
-		document.querySelector('.waveform__container').innerHTML = svgCode;
-	});
-	player.on('presetsLoaded', async () => {
-		await new Promise(requestAnimationFrame);
-		[btnpause, btnplay].forEach(btn => btn.classList.remove('active'));
-		btnstop.classList.add('active');
-		waveform.style.setProperty('--progress', `0%`);
-		waveform.style.setProperty('--time', `"0:00"`);
-
-		document.querySelector('.controls').classList.remove('disabled');
-		document.querySelector('.waveform').classList.remove('disabled');
-		document.querySelector('.programs').classList.remove('disabled');
-
-		[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
-		btnplay.classList.add('active');
-
-		await loadPrograms(channels, presets, (preset, channel) => {
-			busy(player.loadPreset(preset, channel));
+		requestAnimationFrame(() => {
+			songInfos = data;
+			document.querySelector('section > div.karaoke').style.setProperty('--title', `"${songInfos.title}"`);
+			log("Generating waveform...");
+			waveform.style.setProperty('--progress', `0%`);
+			waveform.style.setProperty('--time', `"0:00"`);
+			waveform.style.setProperty('--duration', `"${formatTime(songInfos.duration)}"`);
+			document.querySelector('.waveform__container').innerHTML = svgCode;
 		});
-		await player.play();
-		log('Autoplay');
-
-		log("----------------------------------------");
-		log("|  Drag & drop your .kar or .mid here  |");
-		log("----------------------------------------");
-
-
 	});
-	player.on('logs', str => log(str));
-	player.on('karaoke',async evt => {
-		await new Promise(requestAnimationFrame);
+	player.on('logs', str => requestAnimationFrame(() => log(str)));
+	player.on('karaoke', evt => {
 		if(evt.type == 'title') return;
 		else document.querySelector('section > div.karaoke').innerHTML = `<p>${evt.html}</p>`;
 	});
@@ -309,20 +247,43 @@ class programChooser {
 			log('Error: Invalid file format.');
 			return;
 		}
+		requestAnimationFrame(async () => {
+		
+		
+		
+			document.querySelector('.controls').classList.add('disabled');
+			document.querySelector('.waveform').classList.add('disabled');
+			document.querySelector('.programs').classList.add('disabled');
+			try {
+				log('File droped');
+				if(player.isPlaying()) player.stop(true);
+				const buffer = await file.arrayBuffer();
+				channels = await player.load(buffer);
 
-		document.querySelector('.controls').classList.add('disabled');
-		document.querySelector('.waveform').classList.add('disabled');
-		document.querySelector('.programs').classList.add('disabled');
 
-		try {
-			log('File droped');
-			if(player.isPlaying()) player.stop(true);
-			const buffer = await file.arrayBuffer();
-			channels = await player.load(buffer);
-		} catch(e) {
-			console.error(e);
-			log(`Error: ${e}`);
-		}
+				[btnpause, btnplay].forEach(btn => btn.classList.remove('active'));
+				btnstop.classList.add('active');
+				waveform.style.setProperty('--progress', `0%`);
+				waveform.style.setProperty('--time', `"0:00"`);
+
+				document.querySelector('.controls').classList.remove('disabled');
+				document.querySelector('.waveform').classList.remove('disabled');
+				document.querySelector('.programs').classList.remove('disabled');
+
+				[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
+				btnplay.classList.add('active');
+
+				queueMicrotask(async () => {
+					await loadPrograms(channels, presets)
+					await player.play();
+					log('Autoplay');
+				});
+			} catch(e) {
+				log('Error: Invalid file format');
+			}
+		
+		
+		});
 	}});
 
 
@@ -346,32 +307,41 @@ class programChooser {
 	let lastmeter = 0;
 	let lastprogress = '0:00';
 	setInterval(async () => {
-		await new Promise(requestAnimationFrame);
-		const tick = player.getCurrentTick();
-		if(tick) {
-			const time = (songInfos.duration - player.getSongTimeRemaining()).toFixed(3);
-			if(time != lasttime) {
-				waveform.style.setProperty('--progress', `${time / songInfos.duration * 100}%`);
-				const progress = formatTime(time);
-				if(progress != lastprogress){
-					waveform.style.setProperty('--time', `"${progress}"`);
-					lastprogress = progress;
+		requestAnimationFrame(async () => {
+			const tick = player.getCurrentTick();
+			if(tick) {
+				const time = (songInfos.duration - player.getSongTimeRemaining()).toFixed(3);
+				if(time != lasttime) {
+					waveform.style.setProperty('--progress', `${time / songInfos.duration * 100}%`);
+					const progress = formatTime(time);
+					if(progress != lastprogress){
+						waveform.style.setProperty('--time', `"${progress}"`);
+						lastprogress = progress;
+					}
+					lasttime = time;
 				}
-				lasttime = time;
 			}
-		}
-		const vol = await player.getRealTimeVolume();
-		const indic = Math.ceil(vol * 36);
-		if(indic == lastmeter) return;
-		document.querySelectorAll(`.meter svg .meter__bands > .meter__band:nth-last-child(-n + ${indic})`).forEach(async elm => elm.style.opacity = 1);
-		document.querySelectorAll(`.meter svg .meter__bands > .meter__band:nth-last-child(n + ${indic + 1})`).forEach(async elm => elm.style.opacity = 0.3);
-		lastmeter = indic;
+			const vol = await player.getRealTimeVolume();
+			const indic = Math.ceil(vol * 36);
+			if(indic == lastmeter) return;
+			document.querySelectorAll(`.meter svg .meter__bands > .meter__band:nth-last-child(-n + ${indic})`).forEach(async elm => elm.style.opacity = 1);
+			document.querySelectorAll(`.meter svg .meter__bands > .meter__band:nth-last-child(n + ${indic + 1})`).forEach(async elm => elm.style.opacity = 0.3);
+			lastmeter = indic;
+		});
 	}, 50);
 
 	log("Downloading song...");
 	const response = await fetch(song);
 	const buffer = await response.arrayBuffer();
-	channels = await player.load(buffer);	
+	channels = await player.load(buffer);
+	queueMicrotask(() => loadPrograms(channels, presets));
 
+	log("----------------------------------------");
+	log("|  Drag & drop your .kar or .mid here  |");
+	log("----------------------------------------");
+
+	document.querySelector('.controls').classList.remove('disabled');
+	document.querySelector('.waveform').classList.remove('disabled');
+	document.querySelector('.programs').classList.remove('disabled');
 })();
 

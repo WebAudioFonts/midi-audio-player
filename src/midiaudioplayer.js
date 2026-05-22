@@ -9,7 +9,7 @@ const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
 export default class MidiAudioPlayer extends MidiPlayer.Player {
 
-    static ENDPOINT        = 'https://zmotrin.github.io/webaudiofontjson/';
+    static ENDPOINT        = 'https://webaudiofonts.github.io/presets/';
     static DEFAULT_PRESET  = -1;
     static REFERENCE_GAIN  = 0.15;
     static KARAOKE_CHANNEL = 0;
@@ -103,7 +103,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             const cachedata = this.#opts.localCache ? await indexedDbStorage.getItem(cacheid) : null;
             if (cachedata) return JSON.parse(cachedata);
             this.#log(`Downloading preset ${id}...`);
-            const response = await fetch(`${MidiAudioPlayer.ENDPOINT}presets/${id}.json`);
+            const response = await fetch(`${MidiAudioPlayer.ENDPOINT}${id}.json`);
             const preset = await response.json();
             if(preset.zones === undefined) {
                 console.error(`Invalid preset: ${$id}`);
@@ -118,6 +118,15 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     }
 
 
+    async loadPreset(presetId, channel = null) {
+        const preset = await this.getPreset(presetId);
+        
+        if(channel !== null) {
+            this.#players[channel].preset = preset;
+        }
+    }
+
+
     async load(content) {
 		if(this.isPlaying()) this.stop();
 		this.#clearActiveNotes();
@@ -128,22 +137,14 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         this.#title = "";
 		this.#log('Loading buffer...');
         await this.loadArrayBuffer(content);
-        if(this.#opts.karaoke) {
-            this.#lyrics = null;
-            await this.#generateKaraokeFrames();
-            if(this.#title) this.#sendKaraokeFrame('title', this.#title);
-        }
-        this.#trimMidiEvents();
-        await new Promise(requestAnimationFrame);
-        queueMicrotask(() => this.triggerPlayerEvent('computed'));
+
         this.#log('Loading instruments...');
-        this.#instruments = {};
         this.#channels = await this.#getInstruments();
         this.#channelStates = Object.keys(this.#channels).reduce((acc, key) => ({ ...acc, [key]: false }), {});
         const uniqueInstruments = await this.#getUniqueInstruments();
         if(!Object.values(this.#channels).length) this.#log("Error: no instrument found");
         if(this.#opts.presetRandom || this.#opts.presetAuto) await this.getCatalog();
-        await Promise.all([...uniqueInstruments].map(async program => {
+        const presets = Promise.all([...uniqueInstruments].map(async program => {
             let preset = null;
             if((this.#opts.presetAuto || this.#opts.presetRandom) && this.#opts.presets[program] != MidiAudioPlayer.DEFAULT_PRESET) preset = await this.getPreset(this.#opts.presets[program]);
             else if(this.#opts.presetRandom) preset = await this.#getRandomPreset(program);
@@ -151,10 +152,24 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             else preset = await this.getPreset(this.#opts.presets[program]);
             this.#instruments[program] = preset;
         }));
+
+        if(this.#opts.karaoke) {
+            this.#log('Generating karaoke frames...');
+            this.#lyrics = null;
+            await this.#generateKaraokeFrames();
+            if(this.#title) this.#sendKaraokeFrame('title', this.#title);
+        }
+
+        this.#log(`Trim midi events...`);
+        this.#trimMidiEvents();
+        queueMicrotask(() => this.triggerPlayerEvent('computed'));
+        
+        await presets;
         await Promise.all(Object.keys(this.#channels).map(async channel => {
             if(this.#players[channel]) this.#players[channel].close();
             this.#players[channel] = await this.#createWebAudioFontPlayer(this.#instruments[this.#channels[channel]]);
         }));
+
         this.#log('Initializing instruments state...');
         if (this.events) {
             this.events.forEach((track, trackIdx) => {
@@ -178,6 +193,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
                 });
             });
         }
+
         queueMicrotask(() => super.triggerPlayerEvent('presetsLoaded', this.#instruments));
         return this.#players;
 	}
@@ -290,7 +306,8 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
 
     async triggerPlayerEvent(playerEvent, data) {
-        if(playerEvent == 'computed') {
+        if(playerEvent == 'fileLoaded') return;
+        else if(playerEvent == 'computed') {
             if(this.#opts.muteExpression) this.#vocalChannel = await this.#detectKaraokeVocalChannel();
             super.triggerPlayerEvent(playerEvent, {
                 title: this.#title,
@@ -728,7 +745,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
 
     #trimMidiEvents() {
-        this.#log(`Trim midi events...`);
         if (!this.events || this.events.length === 0) return;
         let firstNoteTick = Infinity;
         let lastNoteTick = 0;
@@ -807,7 +823,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         });
         this.events = trimmedEvents;
         this.totalTicks = lastNoteTick - firstNoteTick;
-        this.#lyrics = null;
+        // this.#lyrics = null;
         if (typeof this.computeTempoMap === 'function') this.computeTempoMap();
     }
 
@@ -976,7 +992,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
 
     async #generateKaraokeFrames() {
-        this.#log('Extracting lyrics...');
         const lyrics = await this.#extractLyrics();
         if (!lyrics.paragraphs.length) {
             this.#haveLyrics = false;
@@ -991,7 +1006,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             return;
         }
         this.#haveLyrics = true;
-        this.#log('Generating karaoke frames...');
         this.#title = lyrics.title;
         let lastFrameEnd = 0;
         const delayTicks = this.secondsToTicks(this.#opts.karaokeDelay);
@@ -1197,11 +1211,12 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             if(type == 'title') queueMicrotask(() => this.triggerPlayerEvent('karaoke', { type: type, title: text, html: html}));
             else queueMicrotask(() => this.triggerPlayerEvent('karaoke', { type: type, html: html}));
         }
-    }
+    }   
 
 
-    #log(str, err = false) {
-        queueMicrotask(() => this.triggerPlayerEvent('logs', str));
+    async #log(str, err = false) {
+        // queueMicrotask(() => this.triggerPlayerEvent('logs', str));
+        this.triggerPlayerEvent('logs', str);
     }
 
 }
