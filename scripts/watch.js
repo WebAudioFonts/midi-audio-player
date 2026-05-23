@@ -36,8 +36,8 @@ const sharedConfig = {
 const formats = [
     { format: 'esm', outfile: 'dist/index.js' },
     { format: 'esm', minify: true, outfile: 'dist/index.mjs' },
-    { format: 'iife', sourcemap: false, outfile: 'dist/midi-audio-player.js' },
-    { format: 'iife', sourcemap: false, minify: true, outfile: 'dist/midi-audio-player.min.js' },
+    { format: 'iife', sourcemap: true, outfile: 'dist/midi-audio-player.js' },
+    { format: 'iife', sourcemap: true, minify: true, outfile: 'dist/midi-audio-player.min.js' },
 ];
 
 async function run() {

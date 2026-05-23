@@ -78,14 +78,20 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
     async getCatalog() {
         if(this.#catalog) return this.#catalog;
-        const cachedata = this.#opts.localCache ? await indexedDbStorage.getItem('waf_catalog') : null;
+        const cachedata = this.#opts.localCache ? await localStorage.getItem('waf_catalog') : null;
         if (cachedata) this.#catalog = JSON.parse(cachedata);
         else {
             this.#log(`Downloading catalog...`);
             const response = await fetch(`${MidiAudioPlayer.ENDPOINT}catalog.json`);
             if (!response.ok) throw new Error(`Impossible to download catalog: ${response.status}`);
             this.#catalog = await response.json();
-            if(this.#opts.localCache) await indexedDbStorage.setItem('waf_catalog', JSON.stringify(this.#catalog));
+            if(this.#opts.localCache) await localStorage.setItem('waf_catalog', JSON.stringify(this.#catalog));
+        }
+        const catalogDate = new Date(this.#catalog.updatedAt).getTime();
+        const catalogVersion = await indexedDbStorage.getItem(`waf_catalog_version`) || 1;
+        if(catalogVersion < catalogDate) {
+            await indexedDbStorage.clear();
+            indexedDbStorage.setItem(`waf_catalog_version`, catalogDate)
         }
         return this.#catalog;
     }
@@ -93,6 +99,14 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
     async getCategories() {
         return (await this.getCatalog()).categories;
+    }
+
+
+    async getProgramInstruments(program) {
+        const categories = await this.getCategories();
+        let instruments = [];
+        await Promise.all(categories.map(async category => category.instruments.filter(elm => elm.program == program).forEach(elm => instruments = [...instruments, ...elm.presets])));
+        return instruments;
     }
 
 
@@ -110,7 +124,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
                 console.error(`Invalid preset: ${$id}`);
                 throw new Error(`Invalid preset: ${$id}`);
             }
-            if(this.#opts.localCache) await indexedDbStorage.setItem(cacheid, JSON.stringify(preset));
+            if(this.#opts.localCache) await indexedDbStorage.setItem(cacheid, JSON.stringify(preset), true);
             return preset;
         } catch(e) {
             console.error(`Invalid preset: ${id}`);
@@ -125,7 +139,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         if(channel !== null) {
             this.#players[channel].preset = preset;
         }
-        
+
     }
 
 
@@ -169,12 +183,12 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         await presets;
         await Promise.all(Object.keys(this.#channels).map(async channel => {
             if(this.#players[channel]) this.#players[channel].close();
-            this.#players[channel] = await this.#createWebAudioFontPlayer(this.#instruments[this.#channels[channel]]);
+            this.#players[channel] = await this.#createPlayer(this.#instruments[this.#channels[channel]]);
         }));
 
         this.#log('Initializing instruments state...');
         if (this.events) {
-            this.collectStateAtTick(1).forEach(event => {
+            this.#collectStateAtTick(1).forEach(event => {
                 const channel = event.channel;
                 if (!this.#players[channel]) return;
                 switch (event.name) {
@@ -256,6 +270,14 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     }
 
 
+    async skipToSeconds(seconds) {
+        const songTime = this.getSongTime();
+        if (seconds < 0 || seconds > songTime) throw seconds + " seconds not within song time of " + songTime;
+        await this.skipToTick(this.secondsToTicks(seconds));
+        return this;
+    }
+
+
     async generateWaveformSVG(samples = 1000) {
         if (!this.totalTicks || !this.events) return '';
         const waveform = new Array(samples).fill(0);
@@ -308,6 +330,9 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         return `<svg class="midiaudioplayer-waveform" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>`;
     }
 
+    // ----------------------------------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------------------------------------------------
 
     async triggerPlayerEvent(playerEvent, data) {
         if(playerEvent == 'fileLoaded') return;
@@ -339,8 +364,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         }
         this.inLoop = true;
         this.tick = this.getCurrentTick();
-        // this._pauseChannelStateUpdates = true;
-        // let notesProcessed = false;
         const tracksLen = this.tracks.length;
         for (let i = 0; i < tracksLen; i++) {
             const result = this.tracks[i].handleEvent(this.tick, dryRun);
@@ -354,12 +377,10 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
                 if (dryRun) {
                     if (name === 'Program Change' && !this.instruments.includes(value)) this.instruments.push(value);
                 } else {
-                    // if (name === 'Note on' || name === 'Note off') notesProcessed = true;
                     this.emitEvent(event);
                 }
             }
         }
-        // this._pauseChannelStateUpdates = false;
         if (!dryRun && this.isPlaying())this.triggerPlayerEvent('playing', { tick: this.tick });
         this.inLoop = false;
     }
@@ -452,53 +473,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     }
 
 
-    async skipToSeconds(seconds) {
-        const songTime = this.getSongTime();
-        if (seconds < 0 || seconds > songTime) throw seconds + " seconds not within song time of " + songTime;
-        await this.skipToTick(this.secondsToTicks(seconds));
-        return this;
-    }
-
-
-    collectStateAtTick(tick) {
-        const dominated = {};
-        if (!this.events) return [];
-        for (let t = 0; t < this.events.length; t++) {
-            const trackEvents = this.events[t];
-            if (!trackEvents || trackEvents.length === 0) continue;
-            let low = 0;
-            let high = trackEvents.length - 1;
-            let endIdx = trackEvents.length;
-            while (low <= high) {
-                const mid = (low + high) >> 1;
-                if (trackEvents[mid].tick >= tick) {
-                    endIdx = mid;
-                    high = mid - 1;
-                } else {
-                    low = mid + 1;
-                }
-            }
-            for (let i = 0; i < endIdx; i++) {
-                const event = trackEvents[i];
-                let key;
-                if (event.name === 'Program Change') {
-                    key = 'pc:' + event.channel;
-                }else if (event.name === 'Controller Change') {
-                    key = 'cc:' + event.channel + ':' + event.number;
-                } else if (event.name === 'Pitch Bend') {
-                    key = 'pb:' + event.channel;
-                } else if (event.name === 'Karaoke Event') {
-                    key = 'ke:' + event.channel;
-                }
-                if (key) {
-                    dominated[key] = event;
-                }
-            }
-        }
-        return Object.keys(dominated).map(key => dominated[key]);
-    }
-
-
     async skipToTick(tick) {
         const safeTick = Math.max(0, Math.min(tick, this.totalTicks || 0));
         const wasPlaying = this.isPlaying();
@@ -516,13 +490,12 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             }
         }
         try {
-
             const controllerChange = [];
             const programChange = [];
             const pitchBend = [];
             const karaokeEvent = [];
 
-            this.collectStateAtTick(safeTick).forEach(event => {
+            this.#collectStateAtTick(safeTick).forEach(event => {
                 const channel = event.channel;
                 if ((channel === undefined || !this.channels[channel]) && event.name !== 'Karaoke Event') return;
                 switch(event.name) {
@@ -568,12 +541,46 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     }
 
 
-    async getProgramInstruments(program) {
-        const categories = await this.getCategories();
-        let instruments = [];
-        await Promise.all(categories.map(async category => category.instruments.filter(elm => elm.program == program).forEach(elm => instruments = [...instruments, ...elm.presets])));
-        return instruments;
+    #collectStateAtTick(tick) {
+        const dominated = {};
+        if (!this.events) return [];
+        for (let t = 0; t < this.events.length; t++) {
+            const trackEvents = this.events[t];
+            if (!trackEvents || trackEvents.length === 0) continue;
+            let low = 0;
+            let high = trackEvents.length - 1;
+            let endIdx = trackEvents.length;
+            while (low <= high) {
+                const mid = (low + high) >> 1;
+                if (trackEvents[mid].tick >= tick) {
+                    endIdx = mid;
+                    high = mid - 1;
+                } else {
+                    low = mid + 1;
+                }
+            }
+            for (let i = 0; i < endIdx; i++) {
+                const event = trackEvents[i];
+                let key;
+                if (event.name === 'Program Change') {
+                    key = 'pc:' + event.channel;
+                }else if (event.name === 'Controller Change') {
+                    key = 'cc:' + event.channel + ':' + event.number;
+                } else if (event.name === 'Pitch Bend') {
+                    key = 'pb:' + event.channel;
+                } else if (event.name === 'Karaoke Event') {
+                    key = 'ke:' + event.channel;
+                }
+                if (key) {
+                    dominated[key] = event;
+                }
+            }
+        }
+        return Object.keys(dominated).map(key => dominated[key]);
     }
+
+
+
 
 
     async #getInstruments() {
@@ -633,7 +640,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     }
 
 
-    async #createWebAudioFontPlayer(preset) {
+    async #createPlayer(preset) {
         return new WebAudioFontPlayer(preset, this.#audioCtx, this.#compressor);
     }
 

@@ -100,7 +100,7 @@ class programChooser {
 		this.#channel = channel;
 		this.#selpreset = selpreset;
 		presets.forEach(preset => preset.name = `${preset.instrument} / ${preset.bank} #${preset.serie + 1}`);
-		this.#presets = presets.sort((a, b) => a.name.localeCompare(b.name));;
+		this.#presets = presets.sort((a, b) => a.name.localeCompare(b.name));
 		try {
 			this.#create();
 		}
@@ -160,6 +160,7 @@ class programChooser {
 (async () => {
 	const song = '../../data/closer.mid';
 
+	let firstPlay = true;
 
 
 	const logs = document.querySelector('.logs');
@@ -264,18 +265,20 @@ class programChooser {
 		waveform.style.setProperty('--progress', `0%`);
 		waveform.style.setProperty('--time', `"0:00"`);
 
+		await loadPrograms(channels, presets, (preset, channel) => busy(player.loadPreset(preset, channel)));
+
 		document.querySelector('.controls').classList.remove('disabled');
 		document.querySelector('.waveform').classList.remove('disabled');
 		document.querySelector('.programs').classList.remove('disabled');
 
-		[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
-		btnplay.classList.add('active');
+		if(!firstPlay) {
+			[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
+			btnplay.classList.add('active');
 
-		await loadPrograms(channels, presets, (preset, channel) => {
-			busy(player.loadPreset(preset, channel));
-		});
-		await player.play();
-		log('Autoplay');
+			await player.play();
+			log('Autoplay');
+		} else firstPlay = false;
+
 
 		log("----------------------------------------");
 		log("|  Drag & drop your .kar or .mid here  |");
@@ -298,7 +301,6 @@ class programChooser {
 		const ratio = x / rect.width;
 		const finalRatio = Math.max(0, Math.min(1, ratio));
 		await player.skipToSeconds(songInfos.duration * finalRatio);
-		// console.log(player.getCurrentTick());
 		[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
 		btnplay.classList.add('active');
 		player.play();
@@ -309,11 +311,9 @@ class programChooser {
 			log('Error: Invalid file format.');
 			return;
 		}
-
 		document.querySelector('.controls').classList.add('disabled');
 		document.querySelector('.waveform').classList.add('disabled');
 		document.querySelector('.programs').classList.add('disabled');
-
 		try {
 			log('File droped');
 			if(player.isPlaying()) player.stop(true);
@@ -321,7 +321,6 @@ class programChooser {
 				const buffer = await file.arrayBuffer();
 				channels = await player.load(buffer);
 			})());
-
 		} catch(e) {
 			console.error(e);
 			log(`Error: ${e}`);
@@ -370,6 +369,7 @@ class programChooser {
 		document.querySelectorAll(`.meter svg .meter__bands > .meter__band:nth-last-child(n + ${indic + 1})`).forEach(async elm => elm.style.opacity = 0.3);
 		lastmeter = indic;
 	}, 50);
+
 
 	log("Downloading song...");
 	const response = await fetch(song);

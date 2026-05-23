@@ -8,8 +8,8 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 1.2.0
-	Généré:  2026-05-22 20:40:02
-	Auteur:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
+	Build:   2026-05-23 13:24:21
+	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/ZmotriN/midi-audio-player/
 	Website: https://zmotrin.github.io/midi-audio-player/
 
@@ -1765,12 +1765,18 @@
   // src/libraries/indexeddbstorage.js
   var DB_NAME = "MidiAudioPlayer";
   var STORE_NAME = "KeyValues";
-  var DB_VERSION = 1;
+  var DEFAULT_VERSION = 1;
   var dbInstance = null;
-  async function getDB() {
+  var currentVersion = DEFAULT_VERSION;
+  async function getDB(version = currentVersion) {
+    if (dbInstance && version !== currentVersion) {
+      dbInstance.close();
+      dbInstance = null;
+      currentVersion = version;
+    }
     if (dbInstance) return dbInstance;
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = indexedDB.open(DB_NAME, version);
       request.onupgradeneeded = (e) => {
         const db = e.target.result;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -1784,26 +1790,49 @@
       request.onerror = (e) => reject(e.target.error);
     });
   }
-  var indexeddbstorage_default = indexedDbStorage = {
-    async setItem(key, value) {
+  var indexedDbStorage = {
+    async setVersion(version) {
+      await getDB(version);
+    },
+    async setItem(key, value, compress = false) {
       const db = await getDB();
+      let finalData = value;
+      let isCompressed = false;
+      if (compress) {
+        const stringData = JSON.stringify(value);
+        const stream = new Blob([stringData]).stream();
+        const compressedStream = stream.pipeThrough(new CompressionStream("gzip"));
+        const response = new Response(compressedStream);
+        finalData = await response.arrayBuffer();
+        isCompressed = true;
+      }
+      const record = { data: finalData, isCompressed };
       return new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, "readwrite");
         const store = transaction.objectStore(STORE_NAME);
-        const request = store.put(value, key);
+        const request = store.put(record, key);
         request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
       });
     },
     async getItem(key) {
       const db = await getDB();
-      return new Promise((resolve, reject) => {
+      const record = await new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, "readonly");
         const store = transaction.objectStore(STORE_NAME);
         const request = store.get(key);
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       });
+      if (!record) return null;
+      if (record.isCompressed) {
+        const stream = new Blob([record.data]).stream();
+        const decompressedStream = stream.pipeThrough(new DecompressionStream("gzip"));
+        const response = new Response(decompressedStream);
+        const text = await response.text();
+        return JSON.parse(text);
+      }
+      return record.data;
     },
     async removeItem(key) {
       const db = await getDB();
@@ -1826,6 +1855,7 @@
       });
     }
   };
+  var indexeddbstorage_default = indexedDbStorage;
 
   // src/presets/defaultpreset.json
   var defaultpreset_default = {
@@ -2028,19 +2058,31 @@
     }
     async getCatalog() {
       if (this.#catalog) return this.#catalog;
-      const cachedata = this.#opts.localCache ? await indexeddbstorage_default.getItem("waf_catalog") : null;
+      const cachedata = this.#opts.localCache ? await localStorage.getItem("waf_catalog") : null;
       if (cachedata) this.#catalog = JSON.parse(cachedata);
       else {
         this.#log(`Downloading catalog...`);
         const response = await fetch(`${_MidiAudioPlayer.ENDPOINT}catalog.json`);
         if (!response.ok) throw new Error(`Impossible to download catalog: ${response.status}`);
         this.#catalog = await response.json();
-        if (this.#opts.localCache) await indexeddbstorage_default.setItem("waf_catalog", JSON.stringify(this.#catalog));
+        if (this.#opts.localCache) await localStorage.setItem("waf_catalog", JSON.stringify(this.#catalog));
+      }
+      const catalogDate = new Date(this.#catalog.updatedAt).getTime();
+      const catalogVersion = await indexeddbstorage_default.getItem(`waf_catalog_version`) || 1;
+      if (catalogVersion < catalogDate) {
+        await indexeddbstorage_default.clear();
+        indexeddbstorage_default.setItem(`waf_catalog_version`, catalogDate);
       }
       return this.#catalog;
     }
     async getCategories() {
       return (await this.getCatalog()).categories;
+    }
+    async getProgramInstruments(program) {
+      const categories = await this.getCategories();
+      let instruments = [];
+      await Promise.all(categories.map(async (category) => category.instruments.filter((elm) => elm.program == program).forEach((elm) => instruments = [...instruments, ...elm.presets])));
+      return instruments;
     }
     async getPreset(id) {
       try {
@@ -2056,7 +2098,7 @@
           console.error(`Invalid preset: ${$id}`);
           throw new Error(`Invalid preset: ${$id}`);
         }
-        if (this.#opts.localCache) await indexeddbstorage_default.setItem(cacheid, JSON.stringify(preset));
+        if (this.#opts.localCache) await indexeddbstorage_default.setItem(cacheid, JSON.stringify(preset), true);
         return preset;
       } catch (e) {
         console.error(`Invalid preset: ${id}`);
@@ -2105,11 +2147,11 @@
       await presets;
       await Promise.all(Object.keys(this.#channels).map(async (channel) => {
         if (this.#players[channel]) this.#players[channel].close();
-        this.#players[channel] = await this.#createWebAudioFontPlayer(this.#instruments[this.#channels[channel]]);
+        this.#players[channel] = await this.#createPlayer(this.#instruments[this.#channels[channel]]);
       }));
       this.#log("Initializing instruments state...");
       if (this.events) {
-        this.collectStateAtTick(1).forEach((event) => {
+        this.#collectStateAtTick(1).forEach((event) => {
           const channel = event.channel;
           if (!this.#players[channel]) return;
           switch (event.name) {
@@ -2178,6 +2220,12 @@
     getSongTimeRemaining() {
       return this.ticksToSeconds(this.getCurrentTick(), this.totalTicks);
     }
+    async skipToSeconds(seconds) {
+      const songTime = this.getSongTime();
+      if (seconds < 0 || seconds > songTime) throw seconds + " seconds not within song time of " + songTime;
+      await this.skipToTick(this.secondsToTicks(seconds));
+      return this;
+    }
     async generateWaveformSVG(samples = 1e3) {
       if (!this.totalTicks || !this.events) return "";
       const waveform = new Array(samples).fill(0);
@@ -2223,6 +2271,9 @@
       const d = `M 0,${height} L ${points.join(" L ")} L ${width},${height}`;
       return `<svg class="midiaudioplayer-waveform" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>`;
     }
+    // ----------------------------------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------------------------------------------------
     async triggerPlayerEvent(playerEvent, data) {
       if (playerEvent == "fileLoaded") return;
       else if (playerEvent == "computed") {
@@ -2348,49 +2399,6 @@
       const desiredTime = Math.max(0, targetTime - seconds);
       return this.secondsToTicks(desiredTime);
     }
-    async skipToSeconds(seconds) {
-      const songTime = this.getSongTime();
-      if (seconds < 0 || seconds > songTime) throw seconds + " seconds not within song time of " + songTime;
-      await this.skipToTick(this.secondsToTicks(seconds));
-      return this;
-    }
-    collectStateAtTick(tick) {
-      const dominated = {};
-      if (!this.events) return [];
-      for (let t = 0; t < this.events.length; t++) {
-        const trackEvents = this.events[t];
-        if (!trackEvents || trackEvents.length === 0) continue;
-        let low = 0;
-        let high = trackEvents.length - 1;
-        let endIdx = trackEvents.length;
-        while (low <= high) {
-          const mid = low + high >> 1;
-          if (trackEvents[mid].tick >= tick) {
-            endIdx = mid;
-            high = mid - 1;
-          } else {
-            low = mid + 1;
-          }
-        }
-        for (let i = 0; i < endIdx; i++) {
-          const event = trackEvents[i];
-          let key;
-          if (event.name === "Program Change") {
-            key = "pc:" + event.channel;
-          } else if (event.name === "Controller Change") {
-            key = "cc:" + event.channel + ":" + event.number;
-          } else if (event.name === "Pitch Bend") {
-            key = "pb:" + event.channel;
-          } else if (event.name === "Karaoke Event") {
-            key = "ke:" + event.channel;
-          }
-          if (key) {
-            dominated[key] = event;
-          }
-        }
-      }
-      return Object.keys(dominated).map((key) => dominated[key]);
-    }
     async skipToTick(tick) {
       const safeTick = Math.max(0, Math.min(tick, this.totalTicks || 0));
       const wasPlaying = this.isPlaying();
@@ -2412,7 +2420,7 @@
         const programChange = [];
         const pitchBend = [];
         const karaokeEvent = [];
-        this.collectStateAtTick(safeTick).forEach((event) => {
+        this.#collectStateAtTick(safeTick).forEach((event) => {
           const channel = event.channel;
           if ((channel === void 0 || !this.channels[channel]) && event.name !== "Karaoke Event") return;
           switch (event.name) {
@@ -2464,11 +2472,42 @@
       else this.triggerPlayerEvent("playing", { tick: safeTick });
       return this;
     }
-    async getProgramInstruments(program) {
-      const categories = await this.getCategories();
-      let instruments = [];
-      await Promise.all(categories.map(async (category) => category.instruments.filter((elm) => elm.program == program).forEach((elm) => instruments = [...instruments, ...elm.presets])));
-      return instruments;
+    #collectStateAtTick(tick) {
+      const dominated = {};
+      if (!this.events) return [];
+      for (let t = 0; t < this.events.length; t++) {
+        const trackEvents = this.events[t];
+        if (!trackEvents || trackEvents.length === 0) continue;
+        let low = 0;
+        let high = trackEvents.length - 1;
+        let endIdx = trackEvents.length;
+        while (low <= high) {
+          const mid = low + high >> 1;
+          if (trackEvents[mid].tick >= tick) {
+            endIdx = mid;
+            high = mid - 1;
+          } else {
+            low = mid + 1;
+          }
+        }
+        for (let i = 0; i < endIdx; i++) {
+          const event = trackEvents[i];
+          let key;
+          if (event.name === "Program Change") {
+            key = "pc:" + event.channel;
+          } else if (event.name === "Controller Change") {
+            key = "cc:" + event.channel + ":" + event.number;
+          } else if (event.name === "Pitch Bend") {
+            key = "pb:" + event.channel;
+          } else if (event.name === "Karaoke Event") {
+            key = "ke:" + event.channel;
+          }
+          if (key) {
+            dominated[key] = event;
+          }
+        }
+      }
+      return Object.keys(dominated).map((key) => dominated[key]);
     }
     async #getInstruments() {
       const instrumentMap = {};
@@ -2519,7 +2558,7 @@
       if (preset) return await this.getPreset(preset.id);
       else return await this.getPreset(instruments[0].id);
     }
-    async #createWebAudioFontPlayer(preset) {
+    async #createPlayer(preset) {
       return new index_default(preset, this.#audioCtx, this.#compressor);
     }
     async #handleMidiPipeline(event) {
@@ -3077,3 +3116,4 @@ webaudiofontplayer/dist/index.js:
   
   *)
 */
+//# sourceMappingURL=midi-audio-player.js.map
