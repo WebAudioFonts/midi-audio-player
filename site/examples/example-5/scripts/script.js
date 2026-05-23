@@ -1,146 +1,114 @@
-const formatTime = (secondsFloat) => {
-    const totalSeconds = Math.floor(secondsFloat);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-const create = (tag, classname=null, content=null, attrs={}) => {
-    const elm = document.createElement(tag);
-    if(classname) elm.className = classname;
-    if(content) elm.innerHTML = content;
-	Object.entries(attrs).forEach(a => elm.setAttribute(a[0], a[1]));
-    return elm;
-};
-HTMLElement.prototype.create = function(tag, classname=null, content=null, attrs={}) {
-    const elm = create(tag, classname, content, attrs);
-    this.append(elm);
-    return elm;
-};
+import "./libraries/helpers";
+import DNDZone from "./libraries/dndzone";
+import programChooser from "./libraries/programchooser";
 
 
 
-class DNDZone {
 
-	container = null;
-	opts = { onFileDrop: null };
+({
 
-	constructor(container, opts = {}) {
-		this.opts = { ...this.opts, ...opts };
-		if(typeof container != 'string') this.container = container;
-		else this.container = document.querySelector(container);
-		this.container.addEventListener('dragover',  e => e.preventDefault());
-		this.container.addEventListener('dragenter', e => this.dragEnter(e));
-		this.container.addEventListener('dragleave', e => this.dragLeave(e));
-		this.container.addEventListener('drop',      e => this.drop(e));
-	}
+	song: '../../data/closer.mid',
+	
+	player: null,
+	presets: {},
+	programs: {},
+	channels: {},
 
-	dragEnter(e) {
-		e.preventDefault();
-		this.container.classList.add('dragover');
-	}
-
-	dragLeave(e) {
-		this.container.classList.remove('dragover');
-	}
-
-	async drop(e) {
-		e.preventDefault();
-		const files = e.dataTransfer.files;
-		this.container.classList.remove('dragover');
-		if (files.length > 0) await this.opts.onFileDrop?.(e.dataTransfer.files[0]);
-	}
-
-}
+	btnPlay: null,
+	btnPause: null,
+	btnStop: null,
+	
+	ctrlControls: null,
+	ctrlWaveform: null,
+	ctrlPrograms: null,
 
 
 
-class programChooser {
-
-	#parent = null;
-	#channel = null;
-	#presets = null;
-	#selpreset = null;
-	#light = null;
-	#active = false;
-	#currentAnimation = null;
 
 
-	constructor(parent, channel, presets, selpreset) {
-		this.#parent = parent;
-		this.#channel = channel;
-		this.#selpreset = selpreset;
-		presets.forEach(preset => preset.name = `${preset.instrument} / ${preset.bank} #${preset.serie + 1}`);
-		this.#presets = presets.sort((a, b) => a.name.localeCompare(b.name));;
-		
-		try {
-			this.#create();
-
-		}
-		catch(e) {
-			console.log(this.#presets);
-		}
-		
-	}
+	logs: null,
 
 
-	#create() {
-		const container = create('div', 'instrument');
-		const select = container.create('select');
-		select.create('option', null, this.#presets[0].category, { disabled: true });
-		this.#presets.forEach(preset => {
-			select.create('option', null, preset.name, { value: preset.id });
-		});
-		select.value = this.#selpreset;
+	opts: {
+		volume: localStorage.getItem('waf_volume') || 0.7,
+		reverb: 0.3,
+		presetRandom: true,
+		presetAuto: true,
+		localCache: true,
+		karaoke: true,
+		// muteExpression: true,
+		// preferred: ["JCLive", "LesPaul", "Chaos"],
 
-		container.create('div', 'program', `#${this.#channel}`);
-		this.#light = container.create('div', 'light');
-		requestAnimationFrame(() => {
-			this.#parent.appendChild(container);
-		});
-		
-	}
+	},
+	
 
+	init: async function() {
 
-	setActive(active) {
-		if (active && !this.#active) {
-			this.#active = true;
-			if (this.#currentAnimation) this.#currentAnimation.cancel();
-			this.#currentAnimation = this.#light.animate(
-				[{ '--light-opacity': 0 }, { '--light-opacity': 1 }],
-				{ duration: 5, easing: 'ease-out', fill: 'forwards' }
-			);
+		console.log("test");
 
-		} else if (!active && this.#active) {
-			this.#active = false;
-			if (this.#currentAnimation) this.#currentAnimation.cancel();
-			this.#currentAnimation = this.#light.animate(
-				[{ '--light-opacity': 1 }, { '--light-opacity': 0 }],
-				{ duration: 250, easing: 'ease-in', fill: 'forwards' }
-			);
-		}
-	}
+		await this.initUI();
+		await this.initPlayer();
+
+		const response = await fetch(this.song);
+		const buffer = await response.arrayBuffer();
+		await this.player.load(buffer);
 
 
-}
+	},
+
+
+	initUI: async function() {
+		this.logs = document.querySelector('.logs');
+		this.btnPlay = document.querySelector('.btn.play');
+		this.btnStop = document.querySelector('.btn.stop');
+		this.btnPause = document.querySelector('.btn.pause');
+		this.ctrlControls = document.querySelector('.controls');
+		this.ctrlWaveform = document.querySelector('.waveform');
+		this.ctrlPrograms = document.querySelector('.programs');
+	},
+
+
+	initPlayer: async function() {
+		this.player = new MidiAudioPlayer(this.opts);
+		this.player.on('logs', str => this.log(str));
+
+
+	},
+
+
+	freeze: function() {
+		this.ctrlControls.classList.add('disabled');
+		this.ctrlWaveform.classList.add('disabled');
+		this.ctrlPrograms.classList.add('disabled');
+	},
+
+	unfreeze: function() {
+
+		this.ctrlControls.classList.remove('disabled');
+		this.ctrlWaveform.classList.remove('disabled');
+		this.ctrlPrograms.classList.remove('disabled');
+
+	},
 
 
 
-(async () => {
-	const song = '../../data/closer.mid';
+	play: async function() {
+
+		[this.btnPause, this.btnStop].forEach(btn => btn.classList.remove('active'));
+		this.btnplay.classList.add('active');
+		await this.player.play();
+		log(this.player.getCurrentTick() ? "Resume" : "Play");
+
+	},
 
 
-
-	const logs = document.querySelector('.logs');
-	const btnplay = document.querySelector('.btn.play');
-	const btnstop = document.querySelector('.btn.stop');
-	const btnpause = document.querySelector('.btn.pause');
-
-	const presets = {};
-	const programs = {};
-	let channels = null;
+	pause: async function() {},
+	
+	
+	stop: async function() {},
 
 
-	const log = async (str) => {
+	log: async function(str) {
 		const now = new Date();
 		const formatted = new Intl.DateTimeFormat('en-CA', {
 			hour: '2-digit',
@@ -148,10 +116,46 @@ class programChooser {
 			second: '2-digit',
 			hour12: false
 		}).format(now).replace(/,/g, '');
-		if(logs.innerText) logs.innerText += "\n";
-		logs.innerText += `[${formatted}] ${str}`;
-		logs.scrollTop = logs.scrollHeight;
-	}
+		await new Promise(requestAnimationFrame);
+		if(this.logs.innerText) this.logs.innerText += "\n";
+		this.logs.innerText += `[${formatted}] ${str}`;
+		this.logs.scrollTop = this.logs.scrollHeight;
+	},
+
+
+}).init();
+
+
+
+
+
+(async () => {
+	// const song = ;
+
+
+
+	// const logs = document.querySelector('.logs');
+	// const btnplay = document.querySelector('.btn.play');
+	// const btnstop = document.querySelector('.btn.stop');
+	// const btnpause = document.querySelector('.btn.pause');
+
+	// const presets = {};
+	// const programs = {};
+	// let channels = null;
+
+
+	// const log = async (str) => {
+	// 	const now = new Date();
+	// 	const formatted = new Intl.DateTimeFormat('en-CA', {
+	// 		hour: '2-digit',
+	// 		minute: '2-digit',
+	// 		second: '2-digit',
+	// 		hour12: false
+	// 	}).format(now).replace(/,/g, '');
+	// 	if(logs.innerText) logs.innerText += "\n";
+	// 	logs.innerText += `[${formatted}] ${str}`;
+	// 	logs.scrollTop = logs.scrollHeight;
+	// }
 
 
 	const loadPrograms = async (channels, presets) => {
@@ -165,12 +169,12 @@ class programChooser {
 	}
 
 
-	btnplay.addEventListener('click', async () => {
-		[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
-		btnplay.classList.add('active');
-		await player.play();
-		log(player.getCurrentTick() ? "Resume" : "Play");
-	});
+	// btnplay.addEventListener('click', async () => {
+	// 	[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
+	// 	btnplay.classList.add('active');
+	// 	await player.play();
+	// 	log(player.getCurrentTick() ? "Resume" : "Play");
+	// });
 
 	btnstop.addEventListener('click', () => {
 		[btnpause, btnplay].forEach(btn => btn.classList.remove('active'));
@@ -192,17 +196,17 @@ class programChooser {
 
 	log("Initializing player...");
 	let songInfos = null;
-	const waveform = document.querySelector('.waveform');
-	const player = new MidiAudioPlayer({
-		volume: localStorage.getItem('waf_volume') || 0.7,
-		reverb: 0.3,
-		presetRandom: true,
-		presetAuto: true,
-		localCache: true,
-		karaoke: true,
-		// muteExpression: true,
-		preferred: ["JCLive", "LesPaul", "Chaos"],
-	});
+	// const waveform = document.querySelector('.waveform');
+	// const player = new MidiAudioPlayer({
+	// 	volume: localStorage.getItem('waf_volume') || 0.7,
+	// 	reverb: 0.3,
+	// 	presetRandom: true,
+	// 	presetAuto: true,
+	// 	localCache: true,
+	// 	karaoke: true,
+	// 	// muteExpression: true,
+	// 	preferred: ["JCLive", "LesPaul", "Chaos"],
+	// });
 	player.on('endOfFile', async () => {
 		[btnpause, btnplay].forEach(btn => btn.classList.remove('active'));
 		btnstop.classList.add('active');
@@ -222,7 +226,7 @@ class programChooser {
 			document.querySelector('.waveform__container').innerHTML = svgCode;
 		});
 	});
-	player.on('logs', str => requestAnimationFrame(() => log(str)));
+	// player.on('logs', str => requestAnimationFrame(() => log(str)));
 	player.on('karaoke', evt => {
 		if(evt.type == 'title') return;
 		else document.querySelector('section > div.karaoke').innerHTML = `<p>${evt.html}</p>`;
@@ -230,6 +234,10 @@ class programChooser {
 	player.on('channelState', async channels => {
 		Object.keys(channels).map(async channel => programs[channel].setActive(channels[channel]));
 	});
+
+
+
+
 	document.querySelector('.waveform__click').addEventListener('click', async event => {
 		const rect = event.currentTarget.getBoundingClientRect();
 		const x = event.clientX - rect.left;
@@ -334,7 +342,7 @@ class programChooser {
 	const response = await fetch(song);
 	const buffer = await response.arrayBuffer();
 	channels = await player.load(buffer);
-	queueMicrotask(() => loadPrograms(channels, presets));
+	// queueMicrotask(() => loadPrograms(channels, presets));
 
 	log("----------------------------------------");
 	log("|  Drag & drop your .kar or .mid here  |");
@@ -343,5 +351,5 @@ class programChooser {
 	document.querySelector('.controls').classList.remove('disabled');
 	document.querySelector('.waveform').classList.remove('disabled');
 	document.querySelector('.programs').classList.remove('disabled');
-})();
+});
 

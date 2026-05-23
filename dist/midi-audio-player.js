@@ -8,7 +8,7 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 1.2.0
-	Build:   2026-05-23 14:06:32
+	Build:   2026-05-23 17:16:00
 	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/ZmotriN/midi-audio-player/
 	Website: https://zmotrin.github.io/midi-audio-player/
@@ -2151,8 +2151,8 @@
       }));
       this.#log("Initializing instrument states...");
       await this.#initInstrumentStates();
-      queueMicrotask(() => super.triggerPlayerEvent("presetsLoaded", this.#instruments));
-      return this.#players;
+      await this.triggerPlayerEvent("presetsLoaded", this.#instruments);
+      this.#log("Player ready");
     }
     async play(content = null) {
       if (this.#audioCtx.state === "suspended") {
@@ -3091,7 +3091,7 @@
       }
     }
     async #log(str, err = false) {
-      this.triggerPlayerEvent("logs", str);
+      queueMicrotask(() => this.triggerPlayerEvent("logs", str));
     }
   };
 

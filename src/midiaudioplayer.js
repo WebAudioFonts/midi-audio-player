@@ -188,9 +188,8 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
         this.#log("Initializing instrument states...");
         await this.#initInstrumentStates();
-
-        queueMicrotask(() => super.triggerPlayerEvent('presetsLoaded', this.#instruments));
-        return this.#players;
+        await this.triggerPlayerEvent('presetsLoaded', this.#instruments);
+        this.#log("Player ready");
 	}
 
 
@@ -358,7 +357,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
                 }
             }
         }
-        if (!dryRun && this.isPlaying())this.triggerPlayerEvent('playing', { tick: this.tick });
+        if (!dryRun && this.isPlaying()) this.triggerPlayerEvent('playing', { tick: this.tick });
         this.inLoop = false;
     }
 
@@ -1226,7 +1225,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
 
     async #log(str, err = false) {
-        this.triggerPlayerEvent('logs', str);
+        queueMicrotask(() => this.triggerPlayerEvent('logs', str));
     }
 
 }
