@@ -1,5 +1,5 @@
 import MidiPlayer from 'midi-player-js';
-import WebAudioFontPlayer from "./libraries/webaudiofontplayer";
+import WebAudioFontPlayer from 'webaudiofontplayer';
 import AudioCompressor from './libraries/audiocompressor';
 import indexedDbStorage from './libraries/indexeddbstorage';
 import DefaultPreset from "./presets/defaultpreset.json";
@@ -121,10 +121,11 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
     async loadPreset(presetId, channel = null) {
         const preset = await this.getPreset(presetId);
-        
+
         if(channel !== null) {
             this.#players[channel].preset = preset;
         }
+        
     }
 
 
@@ -164,7 +165,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         this.#log(`Trim midi events...`);
         this.#trimMidiEvents();
         queueMicrotask(() => this.triggerPlayerEvent('computed'));
-        
+
         await presets;
         await Promise.all(Object.keys(this.#channels).map(async channel => {
             if(this.#players[channel]) this.#players[channel].close();
@@ -338,8 +339,8 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         }
         this.inLoop = true;
         this.tick = this.getCurrentTick();
-        this._pauseChannelStateUpdates = true;
-        let notesProcessed = false;
+        // this._pauseChannelStateUpdates = true;
+        // let notesProcessed = false;
         const tracksLen = this.tracks.length;
         for (let i = 0; i < tracksLen; i++) {
             const result = this.tracks[i].handleEvent(this.tick, dryRun);
@@ -353,12 +354,12 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
                 if (dryRun) {
                     if (name === 'Program Change' && !this.instruments.includes(value)) this.instruments.push(value);
                 } else {
-                    if (name === 'Note on' || name === 'Note off') notesProcessed = true;
+                    // if (name === 'Note on' || name === 'Note off') notesProcessed = true;
                     this.emitEvent(event);
                 }
             }
         }
-        this._pauseChannelStateUpdates = false;
+        // this._pauseChannelStateUpdates = false;
         if (!dryRun && this.isPlaying())this.triggerPlayerEvent('playing', { tick: this.tick });
         this.inLoop = false;
     }
@@ -529,7 +530,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
                     case 'Program Change': programChange[event.channel] = event; break;
                     case 'Pitch Bend': pitchBend[event.channel] = event; break;
                     case 'Karaoke Event': karaokeEvent[event.channel] = event; break;
-                }                       
+                }
             });
             controllerChange.forEach(evt => this.emitEvent(evt));
             programChange.forEach(evt => this.emitEvent(evt));
@@ -1210,7 +1211,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             if(type == 'title') queueMicrotask(() => this.triggerPlayerEvent('karaoke', { type: type, title: text, html: html}));
             else queueMicrotask(() => this.triggerPlayerEvent('karaoke', { type: type, html: html}));
         }
-    }   
+    }
 
 
     async #log(str, err = false) {

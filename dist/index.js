@@ -1212,7 +1212,7 @@ var index = {
   Constants
 };
 
-// src/libraries/webaudiofontplayer.js
+// node_modules/webaudiofontplayer/dist/index.js
 var WebAudioFontPlayer = class {
   #audioCtx = null;
   #compressor = null;
@@ -1510,6 +1510,8 @@ var WebAudioFontPlayer = class {
     return typeof a === "number" ? a : b;
   }
 };
+if (typeof window !== "undefined") window.WebAudioFontPlayer = WebAudioFontPlayer;
+var index_default = WebAudioFontPlayer;
 
 // src/libraries/audiocompressor.js
 var AudioCompressor = class _AudioCompressor {
@@ -1521,11 +1523,8 @@ var AudioCompressor = class _AudioCompressor {
   #reverbNode = null;
   #reverbWet = null;
   #currentReverbLevel = 0;
-  // EQ — map de fréquence → { filter, gain courant }
   #eqBands = /* @__PURE__ */ new Map();
   static #EQ_FREQUENCIES = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
-  // Q par bande : large dans les basses, serré dans les aigus
-  // Donne une courbe ronde et musicale sans artefacts de phase
   static #EQ_Q = /* @__PURE__ */ new Map([
     [32, 0.7],
     [64, 0.8],
@@ -1676,7 +1675,6 @@ var AudioCompressor = class _AudioCompressor {
     if (!preset) throw new Error(`Preset EQ inconnu : "${name}". Disponibles : ${Object.keys(presets).join(", ")}`);
     this.setEQ(preset);
   }
-  // ─── Interpolation Catmull-Rom (tangentes centrées) en log-espace ──────────
   /**
    * Lisse les gains cibles avec des splines Catmull-Rom en espace log-fréquence.
    * Retourne une nouvelle Map freq→dB avec les mêmes clés.
@@ -2253,8 +2251,6 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     }
     this.inLoop = true;
     this.tick = this.getCurrentTick();
-    this._pauseChannelStateUpdates = true;
-    let notesProcessed = false;
     const tracksLen = this.tracks.length;
     for (let i = 0; i < tracksLen; i++) {
       const result = this.tracks[i].handleEvent(this.tick, dryRun);
@@ -2268,12 +2264,10 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
         if (dryRun) {
           if (name === "Program Change" && !this.instruments.includes(value)) this.instruments.push(value);
         } else {
-          if (name === "Note on" || name === "Note off") notesProcessed = true;
           this.emitEvent(event);
         }
       }
     }
-    this._pauseChannelStateUpdates = false;
     if (!dryRun && this.isPlaying()) this.triggerPlayerEvent("playing", { tick: this.tick });
     this.inLoop = false;
   }
@@ -2526,7 +2520,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     else return await this.getPreset(instruments[0].id);
   }
   async #createWebAudioFontPlayer(preset) {
-    return new WebAudioFontPlayer(preset, this.#audioCtx, this.#compressor);
+    return new index_default(preset, this.#audioCtx, this.#compressor);
   }
   async #handleMidiPipeline(event) {
     if (!this.isPlaying()) return;
@@ -3061,9 +3055,29 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
 
 // index.js
 if (typeof window !== "undefined") window.MidiAudioPlayer = MidiAudioPlayer;
-var index_default = MidiAudioPlayer;
+var index_default2 = MidiAudioPlayer;
 export {
   MidiAudioPlayer,
-  index_default as default
+  index_default2 as default
 };
+/*! Bundled license information:
+
+webaudiofontplayer/dist/index.js:
+  (*!
+  
+  	██╗    ██╗███████╗██████╗  █████╗ ██╗   ██╗██████╗ ██╗ ██████╗ ███████╗ ██████╗ ███╗   ██╗████████╗██████╗ ██╗      █████╗ ██╗   ██╗███████╗██████╗
+  	██║    ██║██╔════╝██╔══██╗██╔══██╗██║   ██║██╔══██╗██║██╔═══██╗██╔════╝██╔═══██╗████╗  ██║╚══██╔══╝██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝██╔════╝██╔══██╗
+  	██║ █╗ ██║█████╗  ██████╔╝███████║██║   ██║██║  ██║██║██║   ██║█████╗  ██║   ██║██╔██╗ ██║   ██║   ██████╔╝██║     ███████║ ╚████╔╝ █████╗  ██████╔╝
+  	██║███╗██║██╔══╝  ██╔══██╗██╔══██║██║   ██║██║  ██║██║██║   ██║██╔══╝  ██║   ██║██║╚██╗██║   ██║   ██╔═══╝ ██║     ██╔══██║  ╚██╔╝  ██╔══╝  ██╔══██╗
+  	╚███╔███╔╝███████╗██████╔╝██║  ██║╚██████╔╝██████╔╝██║╚██████╔╝██║     ╚██████╔╝██║ ╚████║   ██║   ██║     ███████╗██║  ██║   ██║   ███████╗██║  ██║
+  	╚══╝╚══╝ ╚══════╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝      ╚═════╝ ╚═╝  ╚═══╝   ╚═╝   ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
+  
+  	Version: 1.0.0
+  	Build:   2026-05-22 22:59:02
+  	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
+  	Github:  https://github.com/WebAudioFonts/webaudiofontplayer
+  	Website: https://github.com/WebAudioFonts/webaudiofontplayer
+  
+  *)
+*/
 //# sourceMappingURL=index.js.map

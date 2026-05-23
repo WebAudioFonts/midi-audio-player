@@ -54,12 +54,13 @@
     "webaudiofont": "./bin/cli.js"
   },
   "dependencies": {
-    "midi-player-js": "^2.0.17"
+    "midi-player-js": "^2.0.17",
+    "webaudiofontplayer": "^1.0.0"
   },
   "devDependencies": {
     "browser-sync": "^3.0.4",
     "esbuild": "^0.28.0",
-    "sass": "^1.99.0"
+    "sass": "^1.100.0"
   },
   "engines": {
     "node": ">=18"

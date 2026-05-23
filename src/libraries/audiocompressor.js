@@ -4,17 +4,12 @@ export default class AudioCompressor {
     #audioCtx = null;
     #limiter = null;
     #analyser = null;
-
     #reverbNode = null;
     #reverbWet = null;
     #currentReverbLevel = 0;
-
-    // EQ — map de fréquence → { filter, gain courant }
     #eqBands = new Map();
+    
     static #EQ_FREQUENCIES = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
-
-    // Q par bande : large dans les basses, serré dans les aigus
-    // Donne une courbe ronde et musicale sans artefacts de phase
     static #EQ_Q = new Map([
         [32,    0.7],
         [64,    0.8],
@@ -27,6 +22,7 @@ export default class AudioCompressor {
         [8192,  1.8],
         [16384, 2.0],
     ]);
+    
 
     constructor(audioCtx, volume, reverb) {
         this.#audioCtx = audioCtx;
@@ -115,11 +111,10 @@ export default class AudioCompressor {
         const now    = this.#audioCtx.currentTime;
         const MAX_DB = 12;
 
-        // 1. Merge les gains demandés dans l'état courant
         const targetGains = new Map();
         for (const freq of freqs) {
             const band = this.#eqBands.get(freq);
-            targetGains.set(freq, band.gain); // valeur courante par défaut
+            targetGains.set(freq, band.gain);
         }
         for (const [key, val] of Object.entries(gains)) {
             const freq = Number(key);
@@ -128,13 +123,8 @@ export default class AudioCompressor {
             }
         }
 
-        // 2. Interpolation Bézier cubique sur les fréquences en log-space.
-        //    On traite les 10 bandes comme des points de contrôle et on utilise
-        //    les tangentes de Catmull-Rom pour construire des cubiques C1
-        //    (continuité de dérivée → transitions rondes sans "kink").
         const smoothedGains = this.#catmullRomSmooth(freqs, targetGains);
 
-        // 3. Appliquer avec le lissage WebAudio (évite les clics)
         for (const freq of freqs) {
             const band    = this.#eqBands.get(freq);
             const dbValue = smoothedGains.get(freq);
@@ -183,7 +173,6 @@ export default class AudioCompressor {
         this.setEQ(preset);
     }
 
-    // ─── Interpolation Catmull-Rom (tangentes centrées) en log-espace ──────────
 
     /**
      * Lisse les gains cibles avec des splines Catmull-Rom en espace log-fréquence.
@@ -191,12 +180,10 @@ export default class AudioCompressor {
      * @private
      */
     #catmullRomSmooth(freqs, targetGains) {
-        // Convertir les fréquences en log pour avoir des espacements perceptuels uniformes
         const logFreqs = freqs.map(f => Math.log2(f));
         const gains    = freqs.map(f => targetGains.get(f));
         const n        = freqs.length;
 
-        // Tangentes Catmull-Rom avec tension α = 0.5 (centripète)
         const tangents = gains.map((_, i) => {
             const prev = i > 0     ? gains[i - 1] : gains[i];
             const next = i < n - 1 ? gains[i + 1] : gains[i];
@@ -206,30 +193,20 @@ export default class AudioCompressor {
             return dx === 0 ? 0 : (next - prev) / dx;
         });
 
-        // Pour chaque bande, on évalue la cubique hermite en son propre point.
-        // En pratique chaque bande est déjà un point de contrôle, donc la valeur
-        // ne change pas ; l'effet se produit sur les valeurs *intermédiaires*.
-        // On ré-évalue à chaque fréquence comme si on avait 3× plus de bandes
-        // virtuelles, puis on re-mappe sur les 10 vraies fréquences.
-        // Cela arrondit les transitions sans déplacer les points de contrôle.
         const smoothed = new Map();
         for (let i = 0; i < n; i++) {
-            // Trouver le segment [i-1, i] ou [i, i+1] le plus centré
-            const seg  = Math.min(i, n - 2);         // segment de gauche
-            const t    = i === seg ? 0.0 : 1.0;      // t=0 début, t=1 fin
+            const seg  = Math.min(i, n - 2);
+            const t    = i === seg ? 0.0 : 1.0;
             const g    = this.#hermite(
                 gains[seg], gains[seg + 1],
                 tangents[seg] * (logFreqs[seg + 1] - logFreqs[seg]),
                 tangents[seg + 1] * (logFreqs[seg + 1] - logFreqs[seg]),
                 t
             );
-            // On préfère la valeur originale (les points de contrôle restent exacts)
             smoothed.set(freqs[i], gains[i]);
-            void g; // la courbe sert surtout pour setEQ avec bandes intermédiaires
+            void g;
         }
 
-        // Passe de lissage léger : moyenne pondérée avec les voisins (1/6, 4/6, 1/6)
-        // → arrondit les angles sans déplacer les extrêmes
         for (let i = 1; i < n - 1; i++) {
             const prev = smoothed.get(freqs[i - 1]);
             const curr = smoothed.get(freqs[i]);
