@@ -149,9 +149,7 @@ export default class AudioCompressor {
      */
     getEQ() {
         const result = {};
-        for (const [freq, band] of this.#eqBands) {
-            result[freq] = band.gain;
-        }
+        for (const [freq, band] of this.#eqBands) result[freq] = band.gain;
         return result;
     }
 

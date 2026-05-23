@@ -8,7 +8,7 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 1.2.0
-	Généré:  2026-05-21 15:44:30
+	Généré:  2026-05-22 20:40:02
 	Auteur:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/ZmotriN/midi-audio-player/
 	Website: https://zmotrin.github.io/midi-audio-player/
@@ -1228,7 +1228,7 @@ var WebAudioFontPlayer = class {
   #sustain = false;
   #pitchBendValue = 8192;
   #notesWaitingForSustain = /* @__PURE__ */ new Set();
-  constructor(audioCtx, compressor, preset) {
+  constructor(preset, audioCtx, compressor = null) {
     this.#audioCtx = audioCtx;
     this.#compressor = compressor;
     this.#preset = preset;
@@ -1237,7 +1237,7 @@ var WebAudioFontPlayer = class {
     this.#expressionGain = this.#audioCtx.createGain();
     this.#expressionGain.gain.setValueAtTime(this.#expressionValue, this.#audioCtx.currentTime);
     this.#mainGain.connect(this.#expressionGain);
-    this.#expressionGain.connect(this.#compressor.input);
+    this.#expressionGain.connect(this.#compressor ? this.#compressor.input : this.#audioCtx.destination);
     this.#preset.zones.map((zone) => this.#adjustZone(zone));
   }
   get preset() {
@@ -1645,9 +1645,7 @@ var AudioCompressor = class _AudioCompressor {
    */
   getEQ() {
     const result = {};
-    for (const [freq, band] of this.#eqBands) {
-      result[freq] = band.gain;
-    }
+    for (const [freq, band] of this.#eqBands) result[freq] = band.gain;
     return result;
   }
   /**
@@ -1980,7 +1978,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     karaoke: false,
     karaokeDelay: 0,
     muteExpression: false,
-    maxBlockPerLine: 16,
+    maxCharPerLine: 48,
     presets: { [-1]: -1 }
   };
   constructor(opts = {}) {
@@ -2027,6 +2025,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     this.#opts.muteExpression = Boolean(val);
   }
   async close() {
+    Object.keys(this.#players).forEach((id) => this.#players[id].close());
     await this.#audioCtx.close();
   }
   async getCatalog() {
@@ -2112,25 +2111,24 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     }));
     this.#log("Initializing instruments state...");
     if (this.events) {
-      this.events.forEach((track, trackIdx) => {
-        track.filter((e) => e.tick === 0).forEach((event) => {
-          if (event.tick === 0) {
-            const channel = event.channel !== void 0 ? event.channel : trackIdx;
-            if (this.#players[channel]) {
-              if (event.name === "Controller Change") {
-                this.#players[channel].setController(event.number, event.value);
-              } else if (event.name === "Pitch Bend") {
-                this.#players[channel].setPitchBend?.(event.value);
-              } else if (event.name === "Program Change") {
-                if ((this.#opts.presetAuto || this.#opts.presetRandom) && event.value >= 0 && event.value <= 127 && this.#instruments[event.value + 1] !== void 0 && event.channel != 10) {
-                  if (this.#players[channel].preset?.program !== event.value + 1) {
-                    this.#players[channel].preset = this.#instruments[event.value + 1];
-                  }
-                }
+      this.collectStateAtTick(1).forEach((event) => {
+        const channel = event.channel;
+        if (!this.#players[channel]) return;
+        switch (event.name) {
+          case "Controller Change":
+            this.#players[channel].setController(event.number, event.value);
+            break;
+          case "Pitch Bend":
+            this.#players[channel].setPitchBend?.(event.value);
+            break;
+          case "Program Change":
+            if ((this.#opts.presetAuto || this.#opts.presetRandom) && event.value >= 0 && event.value <= 127 && this.#instruments[event.value + 1] !== void 0 && event.channel != 10) {
+              if (this.#players[channel].preset?.program !== event.value + 1) {
+                this.#players[channel].preset = this.#instruments[event.value + 1];
               }
             }
-          }
-        });
+            break;
+        }
       });
     }
     queueMicrotask(() => super.triggerPlayerEvent("presetsLoaded", this.#instruments));
@@ -2404,9 +2402,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     const wasPlaying = this.isPlaying();
     this.#clearActiveNotes();
     Object.keys(this.channels).forEach((k) => this.channels[k]?.cancelQueue?.());
-    if (wasPlaying) {
-      super.pause();
-    }
+    if (wasPlaying) super.pause();
     this.startTick = safeTick;
     this.tick = safeTick;
     if (this.tempoMap && this.tempoMap.length > 0) {
@@ -2530,7 +2526,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     else return await this.getPreset(instruments[0].id);
   }
   async #createWebAudioFontPlayer(preset) {
-    return new WebAudioFontPlayer(this.#audioCtx, this.#compressor, preset);
+    return new WebAudioFontPlayer(preset, this.#audioCtx, this.#compressor);
   }
   async #handleMidiPipeline(event) {
     if (!this.isPlaying()) return;
@@ -2541,8 +2537,6 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
         if (event.channel == this.#vocalChannel && this.#opts.muteExpression) return;
         if (event.velocity > 0 && event.velocity <= 127) {
           this.#stopNote(event.channel, event.noteNumber);
-          const normalizedMaster = this.#opts.volume * 100 / 255;
-          const masterGain = Math.pow(normalizedMaster, 2);
           const noteVelocityRatio = event.velocity / 127;
           const finalVol = _MidiAudioPlayer.REFERENCE_GAIN * Math.pow(noteVelocityRatio, 2);
           const envelope = this.#players[event.channel]?.queueWaveTable(0, event.noteNumber, 2, finalVol);
@@ -2801,7 +2795,8 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
           isTimeGapTrigger = true;
         }
       }
-      const isWordLimitTrigger = currentLineBlocks.length >= this.#opts.maxBlockPerLine;
+      const currentLineChars = currentLineBlocks.reduce((sum, b) => sum + b.text.length, 0);
+      const isWordLimitTrigger = currentLineChars + text.length > this.#opts.maxCharPerLine;
       if (isNewLineMarker || isNewParagraphMarker || isTimeGapTrigger || isWordLimitTrigger) {
         if (currentLineBlocks.length > 0) {
           currentParaLines.push({ tick: currentLineBlocks[0].tick, blocks: currentLineBlocks });

@@ -317,8 +317,11 @@ class programChooser {
 		try {
 			log('File droped');
 			if(player.isPlaying()) player.stop(true);
-			const buffer = await file.arrayBuffer();
-			channels = await player.load(buffer);
+			await busy((async () => {
+				const buffer = await file.arrayBuffer();
+				channels = await player.load(buffer);
+			})());
+
 		} catch(e) {
 			console.error(e);
 			log(`Error: ${e}`);

@@ -19,7 +19,7 @@ export default class WebAudioFontPlayer {
     #notesWaitingForSustain = new Set();
 
 
-    constructor(audioCtx, compressor, preset) {
+    constructor(preset, audioCtx, compressor = null) {
         this.#audioCtx = audioCtx;
         this.#compressor = compressor;
         this.#preset = preset;
@@ -28,7 +28,7 @@ export default class WebAudioFontPlayer {
         this.#expressionGain = this.#audioCtx.createGain();
         this.#expressionGain.gain.setValueAtTime(this.#expressionValue, this.#audioCtx.currentTime);
         this.#mainGain.connect(this.#expressionGain);
-        this.#expressionGain.connect(this.#compressor.input);
+        this.#expressionGain.connect(this.#compressor ? this.#compressor.input : this.#audioCtx.destination);
         this.#preset.zones.map(zone => this.#adjustZone(zone));
     }
 
@@ -217,7 +217,6 @@ export default class WebAudioFontPlayer {
         zone.coarseTune = this.#numValue(zone.coarseTune, 0);
         zone.fineTune = this.#numValue(zone.fineTune, 0);
         zone.originalPitch = this.#numValue(zone.originalPitch, 6000);
-        // zone.sampleRate = this.#numValue(zone.sampleRate, this.#preset.sampleRate);
     };
 
 

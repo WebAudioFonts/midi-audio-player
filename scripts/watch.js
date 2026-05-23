@@ -34,10 +34,10 @@ const sharedConfig = {
 };
 
 const formats = [
-	{ format: 'esm', outfile: 'dist/index.js' },
-	{ format: 'esm', minify: true, outfile: 'dist/index.mjs' },
-	{ format: 'iife', outfile: 'dist/midi-audio-player.js' },
-	{ format: 'iife', minify: true, outfile: 'dist/midi-audio-player.min.js' },
+    { format: 'esm', outfile: 'dist/index.js' },
+    { format: 'esm', minify: true, outfile: 'dist/index.mjs' },
+    { format: 'iife', sourcemap: false, outfile: 'dist/midi-audio-player.js' },
+    { format: 'iife', sourcemap: false, minify: true, outfile: 'dist/midi-audio-player.min.js' },
 ];
 
 async function run() {

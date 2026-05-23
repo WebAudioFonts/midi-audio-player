@@ -38,7 +38,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         karaoke: false,
         karaokeDelay: 0,
         muteExpression: false,
-        maxBlockPerLine: 16,
+        maxCharPerLine: 48,
         presets: { [-1]: -1 },
 	};
 
@@ -71,6 +71,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
 
     async close() {
+        Object.keys(this.#players).forEach(id => this.#players[id].close());
         await this.#audioCtx.close();
     }
 
@@ -172,25 +173,27 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
         this.#log('Initializing instruments state...');
         if (this.events) {
-            this.events.forEach((track, trackIdx) => {
-                track.filter(e => e.tick === 0).forEach(event => {
-                    if (event.tick === 0) {
-                        const channel = event.channel !== undefined ? event.channel : trackIdx;
-                        if (this.#players[channel]) {
-                            if (event.name === 'Controller Change') {
-                                this.#players[channel].setController(event.number, event.value);
-                            } else if (event.name === 'Pitch Bend') {
-                                this.#players[channel].setPitchBend?.(event.value);
-                            } else if (event.name === 'Program Change') {
-                                if ((this.#opts.presetAuto || this.#opts.presetRandom) && event.value >= 0 && event.value <= 127 && this.#instruments[event.value + 1] !== undefined && event.channel != 10) {
-                                    if (this.#players[channel].preset?.program !== (event.value + 1)) {
-                                        this.#players[channel].preset = this.#instruments[event.value + 1];
-                                    }
-                                }
+            this.collectStateAtTick(1).forEach(event => {
+                const channel = event.channel;
+                if (!this.#players[channel]) return;
+                switch (event.name) {
+                    case 'Controller Change':
+                        this.#players[channel].setController(event.number, event.value);
+                        break;
+                    case 'Pitch Bend':
+                        this.#players[channel].setPitchBend?.(event.value);
+                        break;
+                    case 'Program Change':
+                        if ((this.#opts.presetAuto || this.#opts.presetRandom) &&
+                            event.value >= 0 && event.value <= 127 &&
+                            this.#instruments[event.value + 1] !== undefined &&
+                            event.channel != 10) {
+                            if (this.#players[channel].preset?.program !== (event.value + 1)) {
+                                this.#players[channel].preset = this.#instruments[event.value + 1];
                             }
                         }
-                    }
-                });
+                        break;
+                }
             });
         }
 
@@ -500,10 +503,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         const wasPlaying = this.isPlaying();
         this.#clearActiveNotes();
         Object.keys(this.channels).forEach(k => this.channels[k]?.cancelQueue?.());
-        if (wasPlaying) {
-            super.pause();
-            // if(this.#opts.karaoke && this.#haveLyrics) this.#sendKaraokeFrame('clear');
-        }
+        if (wasPlaying) super.pause();
         this.startTick = safeTick;
         this.tick = safeTick;
         if (this.tempoMap && this.tempoMap.length > 0) {
@@ -633,7 +633,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
 
     async #createWebAudioFontPlayer(preset) {
-        return new WebAudioFontPlayer(this.#audioCtx, this.#compressor, preset);
+        return new WebAudioFontPlayer(preset, this.#audioCtx, this.#compressor);
     }
 
 
@@ -646,8 +646,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
                 if (event.channel == this.#vocalChannel && this.#opts.muteExpression) return;
                 if (event.velocity > 0 && event.velocity <= 127) {
                     this.#stopNote(event.channel, event.noteNumber);
-                    const normalizedMaster = this.#opts.volume * 100 / 255;
-                    const masterGain = Math.pow(normalizedMaster, 2);
                     const noteVelocityRatio = event.velocity / 127;
                     const finalVol = MidiAudioPlayer.REFERENCE_GAIN * Math.pow(noteVelocityRatio, 2);
                     const envelope = this.#players[event.channel]?.queueWaveTable(0, event.noteNumber, 2, finalVol);
@@ -823,7 +821,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         });
         this.events = trimmedEvents;
         this.totalTicks = lastNoteTick - firstNoteTick;
-        // this.#lyrics = null;
         if (typeof this.computeTempoMap === 'function') this.computeTempoMap();
     }
 
@@ -940,7 +937,9 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
                     isTimeGapTrigger = true;
                 }
             }
-            const isWordLimitTrigger = currentLineBlocks.length >= this.#opts.maxBlockPerLine;
+            const currentLineChars = currentLineBlocks.reduce((sum, b) => sum + b.text.length, 0);
+            const isWordLimitTrigger = currentLineChars + text.length > this.#opts.maxCharPerLine;
+
             if (isNewLineMarker || isNewParagraphMarker || isTimeGapTrigger || isWordLimitTrigger) {
                 if (currentLineBlocks.length > 0) {
                     currentParaLines.push({ tick: currentLineBlocks[0].tick, blocks: currentLineBlocks });
@@ -1215,7 +1214,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
 
     async #log(str, err = false) {
-        // queueMicrotask(() => this.triggerPlayerEvent('logs', str));
         this.triggerPlayerEvent('logs', str);
     }
 
