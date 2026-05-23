@@ -8,7 +8,7 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 1.2.0
-	Build:   2026-05-23 13:24:21
+	Build:   2026-05-23 14:06:32
 	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/ZmotriN/midi-audio-player/
 	Website: https://zmotrin.github.io/midi-audio-player/
@@ -1545,7 +1545,7 @@
       frequencies.forEach((freq) => {
         lastNode = this.#bandEqualizer(lastNode, freq);
         const label = freq < 1e3 ? freq : freq / 1024 + "k";
-        this[`band${label}`] = lastNode;
+        this["band".concat(label)] = lastNode;
       });
       this.#currentReverbLevel = reverb;
       this.#reverbNode = this.#audioCtx.createConvolver();
@@ -1672,7 +1672,7 @@
         electronic: { 32: 6, 64: 5, 128: 2, 256: -1, 512: -2, 1024: -1, 2048: 2, 4096: 4, 8192: 5, 16384: 6 }
       };
       const preset = presets[name];
-      if (!preset) throw new Error(`Preset EQ inconnu : "${name}". Disponibles : ${Object.keys(presets).join(", ")}`);
+      if (!preset) throw new Error('Preset EQ inconnu : "'.concat(name, '". Disponibles : ').concat(Object.keys(presets).join(", ")));
       this.setEQ(preset);
     }
     /**
@@ -2061,17 +2061,17 @@
       const cachedata = this.#opts.localCache ? await localStorage.getItem("waf_catalog") : null;
       if (cachedata) this.#catalog = JSON.parse(cachedata);
       else {
-        this.#log(`Downloading catalog...`);
-        const response = await fetch(`${_MidiAudioPlayer.ENDPOINT}catalog.json`);
-        if (!response.ok) throw new Error(`Impossible to download catalog: ${response.status}`);
+        this.#log("Downloading catalog...");
+        const response = await fetch("".concat(_MidiAudioPlayer.ENDPOINT, "catalog.json"));
+        if (!response.ok) throw new Error("Impossible to download catalog: ".concat(response.status));
         this.#catalog = await response.json();
         if (this.#opts.localCache) await localStorage.setItem("waf_catalog", JSON.stringify(this.#catalog));
       }
       const catalogDate = new Date(this.#catalog.updatedAt).getTime();
-      const catalogVersion = await indexeddbstorage_default.getItem(`waf_catalog_version`) || 1;
+      const catalogVersion = await indexeddbstorage_default.getItem("waf_catalog_version") || 1;
       if (catalogVersion < catalogDate) {
         await indexeddbstorage_default.clear();
-        indexeddbstorage_default.setItem(`waf_catalog_version`, catalogDate);
+        indexeddbstorage_default.setItem("waf_catalog_version", catalogDate);
       }
       return this.#catalog;
     }
@@ -2088,21 +2088,21 @@
       try {
         if (id == "-1") return defaultpreset_default;
         if (typeof id === "object") return id;
-        const cacheid = `waf_preset_${id}`;
+        const cacheid = "waf_preset_".concat(id);
         const cachedata = this.#opts.localCache ? await indexeddbstorage_default.getItem(cacheid) : null;
         if (cachedata) return JSON.parse(cachedata);
-        this.#log(`Downloading preset ${id}...`);
-        const response = await fetch(`${_MidiAudioPlayer.ENDPOINT}${id}.json`);
+        this.#log("Downloading preset ".concat(id, "..."));
+        const response = await fetch("".concat(_MidiAudioPlayer.ENDPOINT).concat(id, ".json"));
         const preset = await response.json();
         if (preset.zones === void 0) {
-          console.error(`Invalid preset: ${$id}`);
-          throw new Error(`Invalid preset: ${$id}`);
+          console.error("Invalid preset: ".concat($id));
+          throw new Error("Invalid preset: ".concat($id));
         }
         if (this.#opts.localCache) await indexeddbstorage_default.setItem(cacheid, JSON.stringify(preset), true);
         return preset;
       } catch (e) {
-        console.error(`Invalid preset: ${id}`);
-        throw new Error(`Invalid preset: ${id}`);
+        console.error("Invalid preset: ".concat(id));
+        throw new Error("Invalid preset: ".concat(id));
       }
     }
     async loadPreset(presetId, channel = null) {
@@ -2141,7 +2141,7 @@
         await this.#generateKaraokeFrames();
         if (this.#title) this.#sendKaraokeFrame("title", this.#title);
       }
-      this.#log(`Trim midi events...`);
+      this.#log("Trim midi events...");
       this.#trimMidiEvents();
       queueMicrotask(() => this.triggerPlayerEvent("computed"));
       await presets;
@@ -2149,28 +2149,8 @@
         if (this.#players[channel]) this.#players[channel].close();
         this.#players[channel] = await this.#createPlayer(this.#instruments[this.#channels[channel]]);
       }));
-      this.#log("Initializing instruments state...");
-      if (this.events) {
-        this.#collectStateAtTick(1).forEach((event) => {
-          const channel = event.channel;
-          if (!this.#players[channel]) return;
-          switch (event.name) {
-            case "Controller Change":
-              this.#players[channel].setController(event.number, event.value);
-              break;
-            case "Pitch Bend":
-              this.#players[channel].setPitchBend?.(event.value);
-              break;
-            case "Program Change":
-              if ((this.#opts.presetAuto || this.#opts.presetRandom) && event.value >= 0 && event.value <= 127 && this.#instruments[event.value + 1] !== void 0 && event.channel != 10) {
-                if (this.#players[channel].preset?.program !== event.value + 1) {
-                  this.#players[channel].preset = this.#instruments[event.value + 1];
-                }
-              }
-              break;
-          }
-        });
-      }
+      this.#log("Initializing instrument states...");
+      await this.#initInstrumentStates();
       queueMicrotask(() => super.triggerPlayerEvent("presetsLoaded", this.#instruments));
       return this.#players;
     }
@@ -2266,10 +2246,10 @@
       const points = normalized.map((val, i) => {
         const x = i;
         const y = Math.max(0, Math.min(height, height - val * height));
-        return `${x},${y.toFixed(2)}`;
+        return "".concat(x, ",").concat(y.toFixed(2));
       });
-      const d = `M 0,${height} L ${points.join(" L ")} L ${width},${height}`;
-      return `<svg class="midiaudioplayer-waveform" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>`;
+      const d = "M 0,".concat(height, " L ").concat(points.join(" L "), " L ").concat(width, ",").concat(height);
+      return '<svg class="midiaudioplayer-waveform" viewBox="0 0 '.concat(width, " ").concat(height, '" preserveAspectRatio="none"><path d="').concat(d, '" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>');
     }
     // ----------------------------------------------------------------------------------------------------------------------
     // ----------------------------------------------------------------------------------------------------------------------
@@ -2509,6 +2489,29 @@
       }
       return Object.keys(dominated).map((key) => dominated[key]);
     }
+    async #initInstrumentStates() {
+      if (this.events) {
+        this.#collectStateAtTick(1).forEach((event) => {
+          const channel = event.channel;
+          if (!this.#players[channel]) return;
+          switch (event.name) {
+            case "Controller Change":
+              this.#players[channel].setController(event.number, event.value);
+              break;
+            case "Pitch Bend":
+              this.#players[channel].setPitchBend?.(event.value);
+              break;
+            case "Program Change":
+              if ((this.#opts.presetAuto || this.#opts.presetRandom) && event.value >= 0 && event.value <= 127 && this.#instruments[event.value + 1] !== void 0 && event.channel != 10) {
+                if (this.#players[channel].preset?.program !== event.value + 1) {
+                  this.#players[channel].preset = this.#instruments[event.value + 1];
+                }
+              }
+              break;
+          }
+        });
+      }
+    }
     async #getInstruments() {
       const instrumentMap = {};
       const channelUsed = /* @__PURE__ */ new Set();
@@ -2682,14 +2685,14 @@
       const globalUniqueKeys = /* @__PURE__ */ new Set();
       for (let i = allSetupEventsBeforeFirstNote.length - 1; i >= 0; i--) {
         const { event, trackIdx } = allSetupEventsBeforeFirstNote[i];
-        const channel = event.channel !== void 0 ? event.channel : `track-${trackIdx}`;
+        const channel = event.channel !== void 0 ? event.channel : "track-".concat(trackIdx);
         let key = null;
         if (event.name === "Program Change") {
-          key = `pc:${channel}`;
+          key = "pc:".concat(channel);
         } else if (event.name === "Controller Change") {
-          key = `cc:${channel}:${event.number}`;
+          key = "cc:".concat(channel, ":").concat(event.number);
         } else if (event.name === "Pitch Bend") {
-          key = `pb:${channel}`;
+          key = "pb:".concat(channel);
         } else if (event.name === "Set Tempo") {
           key = "tempo";
         }
@@ -2882,7 +2885,7 @@
       if (!lyrics.paragraphs.length) {
         this.#haveLyrics = false;
         this.events[_MidiAudioPlayer.KARAOKE_CHANNEL].push({
-          text: `<span class="karaoke-intro"></span>`,
+          text: '<span class="karaoke-intro"></span>',
           name: "Karaoke Event",
           type: "intro",
           tick: 0,
@@ -2922,7 +2925,7 @@
           paragraphDisplayTick = 20;
         paragraphDisplayTicks[pIdx] = paragraphDisplayTick;
         const fastLinesText = p.lines.map((li) => li.blocks.map((b) => b.text).join(""));
-        const initialHTML = fastLinesText.map((lineText) => `<span class="karaoke-coming">${lineText}</span>`).join("<br/>");
+        const initialHTML = fastLinesText.map((lineText) => '<span class="karaoke-coming">'.concat(lineText, "</span>")).join("<br/>");
         this.events[_MidiAudioPlayer.KARAOKE_CHANNEL].push({
           text: initialHTML,
           name: "Karaoke Event",
@@ -2939,7 +2942,7 @@
       const firstParaDisplayTick = paragraphDisplayTicks[0] || 0;
       if (firstParaDisplayTick > 25) {
         this.events[_MidiAudioPlayer.KARAOKE_CHANNEL].push({
-          text: `<span class="karaoke-clear"></span>`,
+          text: '<span class="karaoke-clear"></span>',
           name: "Karaoke Event",
           type: "clear",
           tick: 5,
@@ -2955,9 +2958,9 @@
         const generateHTML = (forceAllPlayedOnActiveLine = false) => {
           return p.lines.map((li, liIdx) => {
             if (liIdx < currentLineIdx)
-              return `<span class="karaoke-played">${fastLinesText[liIdx]}</span>`;
+              return '<span class="karaoke-played">'.concat(fastLinesText[liIdx], "</span>");
             if (liIdx > currentLineIdx)
-              return `<span class="karaoke-coming">${fastLinesText[liIdx]}</span>`;
+              return '<span class="karaoke-coming">'.concat(fastLinesText[liIdx], "</span>");
             let lineHTML = "";
             li.blocks.forEach((block) => {
               let className = "coming";
@@ -2965,7 +2968,7 @@
                 className = "played";
               else if (block.tick === currentBlock.tick)
                 className = "playing";
-              lineHTML += `<span class="karaoke-${className}">${block.text}</span>`;
+              lineHTML += '<span class="karaoke-'.concat(className, '">').concat(block.text, "</span>");
             });
             return lineHTML;
           }).join("<br>");
@@ -3004,7 +3007,7 @@
             }
             if (shouldAddClear && targetClearTick > targetCleanupTick) {
               this.events[_MidiAudioPlayer.KARAOKE_CHANNEL].push({
-                text: `<span class="karaoke-clear"></span>`,
+                text: '<span class="karaoke-clear"></span>',
                 name: "Karaoke Event",
                 type: "clear",
                 tick: targetClearTick - delayTicks,
@@ -3017,7 +3020,7 @@
       });
       if (this.totalTicks - lastFrameEnd > this.secondsToTicks(5)) {
         this.events[_MidiAudioPlayer.KARAOKE_CHANNEL].push({
-          text: `<span class="karaoke-clear"></span>`,
+          text: '<span class="karaoke-clear"></span>',
           name: "Karaoke Event",
           type: "clear",
           tick: lastFrameEnd + this.secondsToTicks(5),
@@ -3025,7 +3028,7 @@
         });
       } else {
         this.events[_MidiAudioPlayer.KARAOKE_CHANNEL].push({
-          text: `<span class="karaoke-clear"></span>`,
+          text: '<span class="karaoke-clear"></span>',
           name: "Karaoke Event",
           type: "clear",
           tick: this.totalTicks - 1,
@@ -3081,7 +3084,7 @@
       return decoded;
     }
     #sendKaraokeFrame(type = "clear", text = "") {
-      const html = `<span class="karaoke-${type}">${text.replace(/\s\/\s/g, "<br>")}</span>`;
+      const html = '<span class="karaoke-'.concat(type, '">').concat(text.replace(/\s\/\s/g, "<br>"), "</span>");
       if (this.#opts.karaoke) {
         if (type == "title") queueMicrotask(() => this.triggerPlayerEvent("karaoke", { type, title: text, html }));
         else queueMicrotask(() => this.triggerPlayerEvent("karaoke", { type, html }));
@@ -3096,24 +3099,4 @@
   if (typeof window !== "undefined") window.MidiAudioPlayer = MidiAudioPlayer;
   var index_default2 = MidiAudioPlayer;
 })();
-/*! Bundled license information:
-
-webaudiofontplayer/dist/index.js:
-  (*!
-  
-  	██╗    ██╗███████╗██████╗  █████╗ ██╗   ██╗██████╗ ██╗ ██████╗ ███████╗ ██████╗ ███╗   ██╗████████╗██████╗ ██╗      █████╗ ██╗   ██╗███████╗██████╗
-  	██║    ██║██╔════╝██╔══██╗██╔══██╗██║   ██║██╔══██╗██║██╔═══██╗██╔════╝██╔═══██╗████╗  ██║╚══██╔══╝██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝██╔════╝██╔══██╗
-  	██║ █╗ ██║█████╗  ██████╔╝███████║██║   ██║██║  ██║██║██║   ██║█████╗  ██║   ██║██╔██╗ ██║   ██║   ██████╔╝██║     ███████║ ╚████╔╝ █████╗  ██████╔╝
-  	██║███╗██║██╔══╝  ██╔══██╗██╔══██║██║   ██║██║  ██║██║██║   ██║██╔══╝  ██║   ██║██║╚██╗██║   ██║   ██╔═══╝ ██║     ██╔══██║  ╚██╔╝  ██╔══╝  ██╔══██╗
-  	╚███╔███╔╝███████╗██████╔╝██║  ██║╚██████╔╝██████╔╝██║╚██████╔╝██║     ╚██████╔╝██║ ╚████║   ██║   ██║     ███████╗██║  ██║   ██║   ███████╗██║  ██║
-  	╚══╝╚══╝ ╚══════╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝      ╚═════╝ ╚═╝  ╚═══╝   ╚═╝   ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
-  
-  	Version: 1.0.0
-  	Build:   2026-05-22 22:59:02
-  	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
-  	Github:  https://github.com/WebAudioFonts/webaudiofontplayer
-  	Website: https://github.com/WebAudioFonts/webaudiofontplayer
-  
-  *)
-*/
 //# sourceMappingURL=midi-audio-player.js.map

@@ -186,31 +186,8 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             this.#players[channel] = await this.#createPlayer(this.#instruments[this.#channels[channel]]);
         }));
 
-        this.#log('Initializing instruments state...');
-        if (this.events) {
-            this.#collectStateAtTick(1).forEach(event => {
-                const channel = event.channel;
-                if (!this.#players[channel]) return;
-                switch (event.name) {
-                    case 'Controller Change':
-                        this.#players[channel].setController(event.number, event.value);
-                        break;
-                    case 'Pitch Bend':
-                        this.#players[channel].setPitchBend?.(event.value);
-                        break;
-                    case 'Program Change':
-                        if ((this.#opts.presetAuto || this.#opts.presetRandom) &&
-                            event.value >= 0 && event.value <= 127 &&
-                            this.#instruments[event.value + 1] !== undefined &&
-                            event.channel != 10) {
-                            if (this.#players[channel].preset?.program !== (event.value + 1)) {
-                                this.#players[channel].preset = this.#instruments[event.value + 1];
-                            }
-                        }
-                        break;
-                }
-            });
-        }
+        this.#log("Initializing instrument states...");
+        await this.#initInstrumentStates();
 
         queueMicrotask(() => super.triggerPlayerEvent('presetsLoaded', this.#instruments));
         return this.#players;
@@ -580,6 +557,33 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     }
 
 
+
+    async #initInstrumentStates() {
+        if (this.events) {
+            this.#collectStateAtTick(1).forEach(event => {
+                const channel = event.channel;
+                if (!this.#players[channel]) return;
+                switch (event.name) {
+                    case 'Controller Change':
+                        this.#players[channel].setController(event.number, event.value);
+                        break;
+                    case 'Pitch Bend':
+                        this.#players[channel].setPitchBend?.(event.value);
+                        break;
+                    case 'Program Change':
+                        if ((this.#opts.presetAuto || this.#opts.presetRandom) &&
+                            event.value >= 0 && event.value <= 127 &&
+                            this.#instruments[event.value + 1] !== undefined &&
+                            event.channel != 10) {
+                            if (this.#players[channel].preset?.program !== (event.value + 1)) {
+                                this.#players[channel].preset = this.#instruments[event.value + 1];
+                            }
+                        }
+                        break;
+                }
+            });
+        }
+    }
 
 
 
