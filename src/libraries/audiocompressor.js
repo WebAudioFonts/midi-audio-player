@@ -64,6 +64,7 @@ export default class AudioCompressor {
         this.#analyser.connect(this.#audioCtx.destination);
     }
 
+    get eqFrequencies() { return AudioCompressor.#EQ_FREQUENCIES }
     get analyser() { return this.#analyser || null; }
     get input() { return this.#input; }
     get reverb() { return this.#currentReverbLevel; }

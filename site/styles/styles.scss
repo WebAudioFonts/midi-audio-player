@@ -293,6 +293,15 @@ section:has(.controls) {
 }
 
 
+.eqrack {
+	position: relative;
+	width: 100%;
+	background-color: var(--color-pre);
+	// font-size: 4rem;
+
+}
+
+
 .karaoke {
 	--title: "";
 	position: relative;

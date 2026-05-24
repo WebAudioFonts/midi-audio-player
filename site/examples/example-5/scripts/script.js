@@ -2,6 +2,7 @@ import "./libraries/helpers";
 import DNDZone from "./libraries/dndzone";
 import DBMeter from "./libraries/dbmeter";
 import Slider from "./libraries/slider";
+import EQRack from "./libraries/eqrack";
 import Timeline from "./libraries/timeline";
 import ProgramChooser from "./libraries/programchooser";
 
@@ -25,6 +26,7 @@ import ProgramChooser from "./libraries/programchooser";
 	ctrlVolume: null,
 	ctrlWaveform: null,
 	ctrlMeter: null,
+	ctrlEqualizer: null,
 	ctrlKaraoke: null,
 	ctrlPrograms: null,
 	
@@ -32,6 +34,7 @@ import ProgramChooser from "./libraries/programchooser";
 	timeline: null,
 	dbmeter: null,
 	volslider: null,
+	eqrack: null,
 	dndzone: null,
 	logs: null,
 
@@ -73,6 +76,7 @@ import ProgramChooser from "./libraries/programchooser";
 		this.ctrlWaveform = document.querySelector('.waveform');
 		this.ctrlMeter = document.querySelector('.meter');
 		this.ctrlVolume = document.querySelector('.dbvol');
+		this.ctrlEqualizer = document.querySelector('.eqrack');
 		this.ctrlKaraoke = document.querySelector('.karaoke');
 		this.ctrlPrograms = document.querySelector('.programs');
 
@@ -84,6 +88,8 @@ import ProgramChooser from "./libraries/programchooser";
 		this.timeline = new Timeline(this.ctrlWaveform, sec => this.skipTo(sec));
 		this.dbmeter = new DBMeter(this.ctrlMeter);
 		this.dndzone = new DNDZone(document.querySelector('.dnd'), { onFileDrop: file => this.drop(file) });
+
+		
 	},
 
 
@@ -94,9 +100,11 @@ import ProgramChooser from "./libraries/programchooser";
 		this.player.on('presetsLoaded', instruments => this.presetLoaded(instruments));
 		this.player.on('endOfFile', () => this.endOfFile());
 		this.player.on('karaoke', evt => this.karaoke(evt));
-		this.player.on('channelState', async channels => {
-			Object.keys(channels).map(async channel => this.programs[channel].setActive(channels[channel]));
-		});
+		this.player.on('channelState', async channels => Object.keys(channels).map(async channel => this.programs[channel].setActive(channels[channel])));
+
+// ctrlEqualizer
+		// console.log(this.player.eqFrequencies);
+		this.eqrack = new EQRack(this.ctrlEqualizer, this.player.eqFrequencies, this.player.eq);
 	},
 
 
@@ -176,10 +184,10 @@ import ProgramChooser from "./libraries/programchooser";
 			const tick = this.player.getCurrentTick();
 			if(tick) {
 				const time = (this.info.duration - this.player.getSongTimeRemaining()).toFixed(3);
-				const vol = await this.player.getRealTimeVolume();
 				await this.timeline.update(time);
-				await this.dbmeter.update(vol);
 			}
+			const vol = await this.player.getRealTimeVolume();
+			await this.dbmeter.update(vol);
 		}, 50);
 	},
 

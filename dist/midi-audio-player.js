@@ -1571,6 +1571,9 @@
       this.#reverbWet.connect(this.#analyser);
       this.#analyser.connect(this.#audioCtx.destination);
     }
+    get eqFrequencies() {
+      return _AudioCompressor.#EQ_FREQUENCIES;
+    }
     get analyser() {
       return this.#analyser || null;
     }
@@ -2051,6 +2054,12 @@
     }
     set muteExpression(val) {
       this.#opts.muteExpression = Boolean(val);
+    }
+    get eqFrequencies() {
+      return this.#compressor.eqFrequencies;
+    }
+    get eq() {
+      return this.#compressor.getEQ();
     }
     async close() {
       Object.keys(this.#players).forEach((id) => this.#players[id].close());

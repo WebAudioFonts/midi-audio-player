@@ -68,6 +68,8 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     set rever(rev) { this.#compressor.reverb = rev; }
     get muteExpression() { return this.#opts.muteExpression; }
     set muteExpression(val) { this.#opts.muteExpression = Boolean(val); }
+    get eqFrequencies() { return this.#compressor.eqFrequencies; }
+    get eq() { return this.#compressor.getEQ(); }
 
 
     async close() {
@@ -560,7 +562,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     }
 
 
-
     async #initInstrumentStates() {
         if (this.events) {
             this.#collectStateAtTick(1).forEach(event => {
@@ -587,7 +588,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             });
         }
     }
-
 
 
     async #getInstruments() {

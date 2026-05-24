@@ -228,6 +228,12 @@ section:has(.controls) {
   row-gap: 1rem;
 }
 
+.eqrack {
+  position: relative;
+  width: 100%;
+  background-color: var(--color-pre);
+}
+
 .karaoke {
   --title: "";
   position: relative;
