@@ -39,6 +39,35 @@ self.escapeHTML = (str) => {
 	});
 }
 
+
+self.concatUint8Arrays = (arrays) => {
+const totalLength = arrays.reduce((acc, arr) => acc + arr.length, 0);
+    const result = new Uint8Array(totalLength);
+    
+    let offset = 0;
+    for (let i = 0; i < arrays.length; i++) {
+        const arr = arrays[i];
+        
+        // --- AJOUTEZ CE LOG ICI ---
+        console.log(`Index ${i}: offset=${offset}, arr.length=${arr.length}, total=${totalLength}, somme=${offset + arr.length}`);
+        // --------------------------
+
+        result.set(arr, offset);
+        offset += arr.length;
+    }
+    return result;
+}
+
+
+self.areUint8ArraysEqual = (a, b) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
+}
+
+
 HTMLElement.prototype.create = function(tag, classname=null, content=null, attrs={}) {
     const elm = create(tag, classname, content, attrs);
     this.append(elm);

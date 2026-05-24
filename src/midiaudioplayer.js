@@ -152,7 +152,11 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         this.#activeNotes = {};
         this.#title = "";
 		this.#log('Loading buffer...');
-        await this.loadArrayBuffer(content);
+        try {
+            await this.loadArrayBuffer(content);
+        } catch(e) {
+            await this.loadArrayBuffer(await this.#repairMidi(content));
+        }
 
         this.#log('Loading instruments...');
         this.#channels = await this.#getInstruments();
@@ -750,6 +754,84 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             this.#channelStates = nextStates;
             this.triggerPlayerEvent('channelState', this.#channelStates);
         }
+    }
+
+
+    async #repairMidi(buffer) {
+        const src = new Uint8Array(buffer);
+        const view = new DataView(buffer);
+        const magic = String.fromCharCode(...src.slice(0, 4));
+        if (magic !== 'MThd') throw new Error('Invalid MIDI file (MThd missing)');
+        const headerLen = view.getUint32(4);
+        const format = view.getUint16(8);
+        const ntrks = view.getUint16(10);
+        const division = view.getUint16(12);
+        const EOT = [0xFF, 0x2F, 0x00];
+        const chunks = [];
+        let pos = 8 + headerLen;
+        while (pos < src.length) {
+            if (pos + 8 > src.length) {
+                break;
+            }
+            const tag = String.fromCharCode(...src.slice(pos, pos + 4));
+            const declaredLen = view.getUint32(pos + 4);
+            const dataStart = pos + 8;
+            const dataEnd = dataStart + declaredLen;
+            if (tag !== 'MTrk') {
+                const end = Math.min(dataEnd, src.length);
+                chunks.push({ tag, data: src.slice(pos, end), repaired: false });
+                pos = dataEnd;
+                continue;
+            }
+            const trackNum = chunks.filter(c => c.tag === 'MTrk').length + 1;
+            const available = Math.min(declaredLen, src.length - dataStart);
+            const trackData = src.slice(dataStart, dataStart + available);
+            const last3 = trackData.slice(-3);
+            const hasEOT = last3[0] === 0xFF && last3[1] === 0x2F && last3[2] === 0x00;
+            if (hasEOT && available === declaredLen) {
+                chunks.push({ tag, data: trackData, repaired: false });
+            } else {
+                let repairedData;
+                if (available < declaredLen) {
+                    const missing = declaredLen - available;
+                    const last2 = trackData.slice(-2);
+                    if (last2[0] === 0xFF && last2[1] === 0x2F) {
+                        repairedData = new Uint8Array(trackData.length + 1);
+                        repairedData.set(trackData);
+                        repairedData[trackData.length] = 0x00;
+                    } else {
+                        repairedData = new Uint8Array(trackData.length + 3);
+                        repairedData.set(trackData);
+                        repairedData.set(EOT, trackData.length);
+                    }
+                } else {
+                    repairedData = new Uint8Array(trackData.length + 3);
+                    repairedData.set(trackData);
+                    repairedData.set(EOT, trackData.length);
+                }
+                chunks.push({ tag, data: repairedData, repaired: true });
+            }
+            pos = dataEnd;
+        }
+        const fixedNtrks = chunks.filter(c => c.tag === 'MTrk').length;
+        const totalSize = 14 + chunks.reduce((acc, c) => acc + 8 + c.data.length, 0);
+        const out = new Uint8Array(totalSize);
+        const outView = new DataView(out.buffer);
+        out.set([0x4D, 0x54, 0x68, 0x64], 0);
+        outView.setUint32(4, 6);
+        outView.setUint16(8, format);
+        outView.setUint16(10, fixedNtrks);
+        outView.setUint16(12, division);
+        let outPos = 14;
+        for (const chunk of chunks) {
+            const tagBytes = chunk.tag.split('').map(c => c.charCodeAt(0));
+            out.set(tagBytes, outPos);
+            outView.setUint32(outPos + 4, chunk.data.length);
+            out.set(chunk.data, outPos + 8);
+            outPos += 8 + chunk.data.length;
+        }
+        const repairedCount = chunks.filter(c => c.repaired).length;
+        return out.buffer;
     }
 
 

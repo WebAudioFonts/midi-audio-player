@@ -17,7 +17,6 @@ import ProgramChooser from "./libraries/programchooser";
 	channels: {},
 	info: { duration: 0 },
 
-
 	btnPlay: null,
 	btnPause: null,
 	btnStop: null,
@@ -34,20 +33,14 @@ import ProgramChooser from "./libraries/programchooser";
 	dbmeter: null,
 	volslider: null,
 	dndzone: null,
-
-	worker: null,
-
-
-
-
-
 	logs: null,
 
+	worker: null,
 
 	opts: {
 		volume: localStorage.getItem('waf_volume') || 0.7,
 		reverb: 0.3,
-		// presetRandom: true,
+		presetRandom: true,
 		presetAuto: true,
 		localCache: true,
 		karaoke: true,
