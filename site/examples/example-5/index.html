@@ -18,80 +18,15 @@
 				<div class="btn pause"></div>
 				<div class="btn stop active"></div>
 			</div>
-			
-			<div class="waveform disabled">
-				<div class="waveform__container"></div>
-				<div class="waveform__progress"><div class="waveform__pointer"></div></div>
-				<div class="waveform__click"></div>
-			</div>
+			<div class="waveform disabled"></div>
 			<pre class="logs"></pre>
-			<div class="meter">
-				<svg viewBox="0 0 40 400">
-					<rect class="meter__background" width="40" height="400" rx="2"/>
-					<rect class="meter__inner" width="28" height="380" x="6" y="10" rx="1"/>
-					<g class="meter__bands">
-						<rect class="meter__band" width="24" height="4" x="8" y="20" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="30" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="40" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="55" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="65" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="75" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="85" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="100" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="110" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="120" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="130" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="140" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="150" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="160" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="170" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="180" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="190" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="200" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="210" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="220" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="230" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="240" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="250" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="260" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="270" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="280" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="290" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="300" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="310" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="320" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="330" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="340" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="350" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="360" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="370" rx="1"/>
-						<rect class="meter__band" width="24" height="4" x="8" y="380" rx="1"/>
-					</g>
-				</svg>
-			</div>
-			<div class="dbvol">
-				<input type="range" class="dbvol__input" min="0" max="100" title="Volume" vertical>
-				<svg viewBox="0 0 40 400" class="dbvol__svg" style="--y: 180px;">
-					<rect class="dbvol__background" width="40" height="400" rx="4" fill="#1a1a1a" />
-					<rect class="dbvol__inner" width="4" height="360" x="18" y="20" rx="2" fill="#000" stroke="#333" />
-					<g class="dbvol__slider">
-						<rect width="30" height="15" x="5" fill="#333" rx="2" />
-						<path fill="#444" d="M5 2h30v11H5z" />
-						<path fill="#00FF00" d="M5 7h30v1H5z" />
-						<path fill-opacity=".3" d="M5 15h30v3H5z" />
-					</g>
-					<path stroke="#444" d="M32 20h4m-4 180h4m-4 180h4" />
-				</svg>
-			</div>
-			
+			<div class="meter"></div>
+			<div class="dbvol"></div>
 		</section>
-
 		<section>
 			<div class="karaoke"><span class="karaoke-intro"></span></div>
 		</section>
-
-		<section class="programs">
-		</section>
+		<section class="programs"></section>
 	</main>
 	<div class="dnd">Drop your mid/kar files here</div>
 	<script src="./scripts/script.min.js"></script>

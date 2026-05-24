@@ -1,4 +1,4 @@
-export default class programChooser {
+export default class ProgramChooser {
 
 	#parent = null;
 	#channel = null;
@@ -7,6 +7,8 @@ export default class programChooser {
 	#light = null;
 	#active = false;
 	#currentAnimation = null;
+	#select = null;
+	#presetCallback = null;
 
 
 	constructor(parent, channel, presets, selpreset) {
@@ -14,34 +16,29 @@ export default class programChooser {
 		this.#channel = channel;
 		this.#selpreset = selpreset;
 		presets.forEach(preset => preset.name = `${preset.instrument} / ${preset.bank} #${preset.serie + 1}`);
-		this.#presets = presets.sort((a, b) => a.name.localeCompare(b.name));;
-		
-		try {
-			this.#create();
+		this.#presets = presets.sort((a, b) => a.name.localeCompare(b.name));
+		this.#create();
+	}
 
-		}
-		catch(e) {
-			console.log(this.#presets);
-		}
-		
+	set presetCallback(val) {
+		this.#presetCallback = val;
 	}
 
 
 	#create() {
 		const container = create('div', 'instrument');
-		const select = container.create('select');
-		select.create('option', null, this.#presets[0].category, { disabled: true });
+		this.#select = container.create('select');
+		this.#select.create('option', null, this.#presets[0].category, { disabled: true });
 		this.#presets.forEach(preset => {
-			select.create('option', null, preset.name, { value: preset.id });
+			this.#select.create('option', null, escapeHTML(preset.name), { value: preset.id });
 		});
-		select.value = this.#selpreset;
-
+		this.#select.value = this.#selpreset;
+		this.#select.addEventListener('change', () => {
+			if(typeof this.#presetCallback === 'function') this.#presetCallback(this.#select.value, this.#channel);
+		});
 		container.create('div', 'program', `#${this.#channel}`);
 		this.#light = container.create('div', 'light');
-		requestAnimationFrame(() => {
-			this.#parent.appendChild(container);
-		});
-		
+		this.#parent.appendChild(container);
 	}
 
 

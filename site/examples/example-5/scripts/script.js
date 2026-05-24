@@ -1,26 +1,41 @@
 import "./libraries/helpers";
 import DNDZone from "./libraries/dndzone";
-import programChooser from "./libraries/programchooser";
-
-
+import DBMeter from "./libraries/dbmeter";
+import Slider from "./libraries/slider";
+import Timeline from "./libraries/timeline";
+import ProgramChooser from "./libraries/programchooser";
 
 
 ({
 
 	song: '../../data/closer.mid',
-	
+	firstPlay: true,
+
 	player: null,
 	presets: {},
 	programs: {},
 	channels: {},
+	info: { duration: 0 },
+
 
 	btnPlay: null,
 	btnPause: null,
 	btnStop: null,
-	
+
 	ctrlControls: null,
+	ctrlVolume: null,
 	ctrlWaveform: null,
+	ctrlMeter: null,
+	ctrlKaraoke: null,
 	ctrlPrograms: null,
+	
+
+	timeline: null,
+	dbmeter: null,
+	volslider: null,
+	dndzone: null,
+
+	worker: null,
 
 
 
@@ -32,7 +47,7 @@ import programChooser from "./libraries/programchooser";
 	opts: {
 		volume: localStorage.getItem('waf_volume') || 0.7,
 		reverb: 0.3,
-		presetRandom: true,
+		// presetRandom: true,
 		presetAuto: true,
 		localCache: true,
 		karaoke: true,
@@ -40,14 +55,13 @@ import programChooser from "./libraries/programchooser";
 		// preferred: ["JCLive", "LesPaul", "Chaos"],
 
 	},
-	
+
 
 	init: async function() {
-
-		console.log("test");
-
+		this.log("Initializing player...");
 		await this.initUI();
 		await this.initPlayer();
+		await this.startWorker();
 
 		const response = await fetch(this.song);
 		const buffer = await response.arrayBuffer();
@@ -64,48 +78,174 @@ import programChooser from "./libraries/programchooser";
 		this.btnPause = document.querySelector('.btn.pause');
 		this.ctrlControls = document.querySelector('.controls');
 		this.ctrlWaveform = document.querySelector('.waveform');
+		this.ctrlMeter = document.querySelector('.meter');
+		this.ctrlVolume = document.querySelector('.dbvol');
+		this.ctrlKaraoke = document.querySelector('.karaoke');
 		this.ctrlPrograms = document.querySelector('.programs');
+
+		this.btnPlay.addEventListener('click', async () => await this.play());
+		this.btnPause.addEventListener('click', async () => await this.pause());
+		this.btnStop.addEventListener('click', async () => await this.stop());
+
+		this.volslider = new Slider(this.ctrlVolume, this.opts.volume, vol => this.setVolume(vol));
+		this.timeline = new Timeline(this.ctrlWaveform, sec => this.skipTo(sec));
+		this.dbmeter = new DBMeter(this.ctrlMeter);
+		this.dndzone = new DNDZone(document.querySelector('.dnd'), { onFileDrop: file => this.drop(file) });
 	},
 
 
 	initPlayer: async function() {
 		this.player = new MidiAudioPlayer(this.opts);
 		this.player.on('logs', str => this.log(str));
-
-
+		this.player.on('computed', (data) => this.computed(data));
+		this.player.on('presetsLoaded', instruments => this.presetLoaded(instruments));
+		this.player.on('endOfFile', () => this.endOfFile());
+		this.player.on('karaoke', evt => this.karaoke(evt));
+		this.player.on('channelState', async channels => {
+			Object.keys(channels).map(async channel => this.programs[channel].setActive(channels[channel]));
+		});
 	},
 
 
 	freeze: function() {
+		document.documentElement.classList.add('is-busy');
 		this.ctrlControls.classList.add('disabled');
 		this.ctrlWaveform.classList.add('disabled');
 		this.ctrlPrograms.classList.add('disabled');
 	},
 
+
 	unfreeze: function() {
-
-		this.ctrlControls.classList.remove('disabled');
-		this.ctrlWaveform.classList.remove('disabled');
 		this.ctrlPrograms.classList.remove('disabled');
-
+		this.ctrlWaveform.classList.remove('disabled');
+		this.ctrlControls.classList.remove('disabled');
+		document.documentElement.classList.remove('is-busy');
 	},
-
 
 
 	play: async function() {
-
 		[this.btnPause, this.btnStop].forEach(btn => btn.classList.remove('active'));
-		this.btnplay.classList.add('active');
+		this.btnPlay.classList.add('active');
 		await this.player.play();
-		log(this.player.getCurrentTick() ? "Resume" : "Play");
+		this.log(this.player.getCurrentTick() ? "Resume" : "Play");
 
 	},
 
 
-	pause: async function() {},
-	
-	
-	stop: async function() {},
+	pause: async function() {
+		if(!this.player.isPlaying()) return log("Not playing");
+		[this.btnStop, this.btnPlay].forEach(btn => btn.classList.remove('active'));
+		this.btnPause.classList.add('active');
+		this.player.pause();
+		this.log("Pause");
+	},
+
+
+	stop: async function() {
+		[this.btnPause, this.btnPlay].forEach(btn => btn.classList.remove('active'));
+		this.btnStop.classList.add('active');
+		this.player.stop();
+		this.timeline.reset();
+		this.log("Stop");
+
+	},
+
+
+	setVolume: function(vol) {
+		this.player.volume = vol;
+		localStorage.setItem(`waf_volume`, this.player.volume);
+	},
+
+
+	skipTo: async function(sec) {
+		await this.player.skipToSeconds(sec);
+		if(!this.player.isPlaying()) this.play();
+	},
+
+
+	loadPrograms: async function(presetCallback) {
+		this.presets = {};
+		this.programs = {};
+		const channels = this.player.channels;
+		const parent = create('div', 'instruments');
+		await Promise.all(Object.keys(channels).map(async channel => this.presets[channels[channel].preset.program] = await this.player.getProgramInstruments(channels[channel].preset.program)));
+		await Promise.all(Object.keys(channels).map(async channel => {
+			this.programs[channel] = new ProgramChooser(parent, channel, this.presets[channels[channel].preset.program], channels[channel].preset.id);
+			this.programs[channel].presetCallback = presetCallback;
+		}));
+		await new Promise(requestAnimationFrame);
+		this.ctrlPrograms.replaceChildren(parent);
+	},
+
+
+	startWorker: async function() {
+		this.worker = setInterval(async () => {
+			const tick = this.player.getCurrentTick();
+			if(tick) {
+				const time = (this.info.duration - this.player.getSongTimeRemaining()).toFixed(3);
+				const vol = await this.player.getRealTimeVolume();
+				await this.timeline.update(time);
+				await this.dbmeter.update(vol);
+			}
+		}, 50);
+	},
+
+
+	computed: async function(data) {
+		this.info = data;
+		this.log("Generating waveform...");
+		const svgCode = await this.player.generateWaveformSVG();
+		this.timeline.load(svgCode, this.info.duration);
+		this.ctrlKaraoke.style.setProperty('--title', `"${this.info.title}"`);
+	},
+
+
+	presetLoaded: async function(instruments) {
+		await this.loadPrograms((preset, channel) => busy(this.player.loadPreset(preset, channel)));
+		if(!this.firstPlay) {
+			this.play();
+			this.log('Autoplay');
+		} else this.firstPlay = false;
+		this.log("----------------------------------------");
+		this.log("|  Drag & drop your .kar or .mid here  |");
+		this.log("----------------------------------------");
+		this.unfreeze();
+	},
+
+
+	endOfFile: async function() {
+		await new Promise(requestAnimationFrame);
+		[this.btnPause, this.btnPlay].forEach(btn => btn.classList.remove('active'));
+		this.btnStop.classList.add('active');
+		this.timeline.reset();
+		this.log("End of file");
+	},
+
+
+	karaoke: async function(evt) {
+		await new Promise(requestAnimationFrame);
+		if(evt.type == 'title') return;
+		else this.ctrlKaraoke.innerHTML = `<p>${evt.html}</p>`;
+	},
+
+
+	drop: async function(file) {
+		if(!['mid', 'midi', 'kar'].includes(file.name.split('.').pop()?.toLowerCase()) || !file.size || file.size > 5242880) {
+			this.log('Error: Invalid file format.');
+			return;
+		}
+		this.freeze();
+		try {
+			this.log('File droped');
+			if(this.player.isPlaying()) this.player.stop(true);
+			const buffer = await file.arrayBuffer();
+			await this.player.load(buffer);
+		} catch(e) {
+			console.error(e);
+			this.log(`Error: ${e}`);
+			this.unfreeze();
+		}
+	},
 
 
 	log: async function(str) {
@@ -124,232 +264,4 @@ import programChooser from "./libraries/programchooser";
 
 
 }).init();
-
-
-
-
-
-(async () => {
-	// const song = ;
-
-
-
-	// const logs = document.querySelector('.logs');
-	// const btnplay = document.querySelector('.btn.play');
-	// const btnstop = document.querySelector('.btn.stop');
-	// const btnpause = document.querySelector('.btn.pause');
-
-	// const presets = {};
-	// const programs = {};
-	// let channels = null;
-
-
-	// const log = async (str) => {
-	// 	const now = new Date();
-	// 	const formatted = new Intl.DateTimeFormat('en-CA', {
-	// 		hour: '2-digit',
-	// 		minute: '2-digit',
-	// 		second: '2-digit',
-	// 		hour12: false
-	// 	}).format(now).replace(/,/g, '');
-	// 	if(logs.innerText) logs.innerText += "\n";
-	// 	logs.innerText += `[${formatted}] ${str}`;
-	// 	logs.scrollTop = logs.scrollHeight;
-	// }
-
-
-	const loadPrograms = async (channels, presets) => {
-		presets = {};
-		const parent = create('div', 'instruments');
-		await Promise.all(Object.keys(channels).map(async channel => presets[channels[channel].preset.program] = await player.getProgramInstruments(channels[channel].preset.program)));
-		await Promise.all(Object.keys(channels).map(async channel => {
-			programs[channel] = new programChooser(parent, channel, presets[channels[channel].preset.program], channels[channel].preset.id);
-		}));
-		document.querySelector('section.programs').replaceChildren(parent);
-	}
-
-
-	// btnplay.addEventListener('click', async () => {
-	// 	[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
-	// 	btnplay.classList.add('active');
-	// 	await player.play();
-	// 	log(player.getCurrentTick() ? "Resume" : "Play");
-	// });
-
-	btnstop.addEventListener('click', () => {
-		[btnpause, btnplay].forEach(btn => btn.classList.remove('active'));
-		btnstop.classList.add('active');
-		player.stop();
-		waveform.style.setProperty('--progress', `0%`);
-		waveform.style.setProperty('--time', `"0:00"`);
-		log("Stop");
-	});
-
-	btnpause.addEventListener('click', () => {
-		if(!player.isPlaying()) return log("Not playing");
-		[btnstop, btnplay].forEach(btn => btn.classList.remove('active'));
-		btnpause.classList.add('active');
-		player.pause();
-		log("Pause");
-	});
-
-
-	log("Initializing player...");
-	let songInfos = null;
-	// const waveform = document.querySelector('.waveform');
-	// const player = new MidiAudioPlayer({
-	// 	volume: localStorage.getItem('waf_volume') || 0.7,
-	// 	reverb: 0.3,
-	// 	presetRandom: true,
-	// 	presetAuto: true,
-	// 	localCache: true,
-	// 	karaoke: true,
-	// 	// muteExpression: true,
-	// 	preferred: ["JCLive", "LesPaul", "Chaos"],
-	// });
-	player.on('endOfFile', async () => {
-		[btnpause, btnplay].forEach(btn => btn.classList.remove('active'));
-		btnstop.classList.add('active');
-		waveform.style.setProperty('--progress', `0%`);
-		waveform.style.setProperty('--time', `"0:00"`);
-		log("End of file");
-	});
-	player.on('computed', async (data) => {
-		const svgCode = await player.generateWaveformSVG();
-		requestAnimationFrame(() => {
-			songInfos = data;
-			document.querySelector('section > div.karaoke').style.setProperty('--title', `"${songInfos.title}"`);
-			log("Generating waveform...");
-			waveform.style.setProperty('--progress', `0%`);
-			waveform.style.setProperty('--time', `"0:00"`);
-			waveform.style.setProperty('--duration', `"${formatTime(songInfos.duration)}"`);
-			document.querySelector('.waveform__container').innerHTML = svgCode;
-		});
-	});
-	// player.on('logs', str => requestAnimationFrame(() => log(str)));
-	player.on('karaoke', evt => {
-		if(evt.type == 'title') return;
-		else document.querySelector('section > div.karaoke').innerHTML = `<p>${evt.html}</p>`;
-	});
-	player.on('channelState', async channels => {
-		Object.keys(channels).map(async channel => programs[channel].setActive(channels[channel]));
-	});
-
-
-
-
-	document.querySelector('.waveform__click').addEventListener('click', async event => {
-		const rect = event.currentTarget.getBoundingClientRect();
-		const x = event.clientX - rect.left;
-		const ratio = x / rect.width;
-		const finalRatio = Math.max(0, Math.min(1, ratio));
-		await player.skipToSeconds(songInfos.duration * finalRatio);
-		// console.log(player.getCurrentTick());
-		[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
-		btnplay.classList.add('active');
-		player.play();
-	});
-
-	new DNDZone(document.querySelector('.dnd'), { onFileDrop: async file => {
-		if(!['mid', 'midi', 'kar'].includes(file.name.split('.').pop()?.toLowerCase()) || !file.size || file.size > 5242880) {
-			log('Error: Invalid file format.');
-			return;
-		}
-		requestAnimationFrame(async () => {
-		
-		
-		
-			document.querySelector('.controls').classList.add('disabled');
-			document.querySelector('.waveform').classList.add('disabled');
-			document.querySelector('.programs').classList.add('disabled');
-			try {
-				log('File droped');
-				if(player.isPlaying()) player.stop(true);
-				const buffer = await file.arrayBuffer();
-				channels = await player.load(buffer);
-
-
-				[btnpause, btnplay].forEach(btn => btn.classList.remove('active'));
-				btnstop.classList.add('active');
-				waveform.style.setProperty('--progress', `0%`);
-				waveform.style.setProperty('--time', `"0:00"`);
-
-				document.querySelector('.controls').classList.remove('disabled');
-				document.querySelector('.waveform').classList.remove('disabled');
-				document.querySelector('.programs').classList.remove('disabled');
-
-				[btnpause, btnstop].forEach(btn => btn.classList.remove('active'));
-				btnplay.classList.add('active');
-
-				queueMicrotask(async () => {
-					await loadPrograms(channels, presets)
-					await player.play();
-					log('Autoplay');
-				});
-			} catch(e) {
-				log('Error: Invalid file format');
-			}
-		
-		
-		});
-	}});
-
-
-	const input = document.querySelector('.dbvol__input');
-	const svg = document.querySelector('.dbvol__svg');
-	input.value = 100 - (player.volume * 100);
-	input.addEventListener('input', (e) => {
-		const val = 100 - parseFloat(e.target.value);
-		const railTop = 20;
-		const railBottom = 365;
-		const travelDistance = railBottom - railTop;
-		const newY = railBottom - (val / 100 * travelDistance);
-		svg.style.setProperty('--y', newY + 'px');
-		player.volume = val / 100;
-		localStorage.setItem(`waf_volume`, player.volume);
-	});
-	input.dispatchEvent(new Event('input', {bubbles: true, cancelable: false }));
-
-
-	let lasttime = 0;
-	let lastmeter = 0;
-	let lastprogress = '0:00';
-	setInterval(async () => {
-		requestAnimationFrame(async () => {
-			const tick = player.getCurrentTick();
-			if(tick) {
-				const time = (songInfos.duration - player.getSongTimeRemaining()).toFixed(3);
-				if(time != lasttime) {
-					waveform.style.setProperty('--progress', `${time / songInfos.duration * 100}%`);
-					const progress = formatTime(time);
-					if(progress != lastprogress){
-						waveform.style.setProperty('--time', `"${progress}"`);
-						lastprogress = progress;
-					}
-					lasttime = time;
-				}
-			}
-			const vol = await player.getRealTimeVolume();
-			const indic = Math.ceil(vol * 36);
-			if(indic == lastmeter) return;
-			document.querySelectorAll(`.meter svg .meter__bands > .meter__band:nth-last-child(-n + ${indic})`).forEach(async elm => elm.style.opacity = 1);
-			document.querySelectorAll(`.meter svg .meter__bands > .meter__band:nth-last-child(n + ${indic + 1})`).forEach(async elm => elm.style.opacity = 0.3);
-			lastmeter = indic;
-		});
-	}, 50);
-
-	log("Downloading song...");
-	const response = await fetch(song);
-	const buffer = await response.arrayBuffer();
-	channels = await player.load(buffer);
-	// queueMicrotask(() => loadPrograms(channels, presets));
-
-	log("----------------------------------------");
-	log("|  Drag & drop your .kar or .mid here  |");
-	log("----------------------------------------");
-
-	document.querySelector('.controls').classList.remove('disabled');
-	document.querySelector('.waveform').classList.remove('disabled');
-	document.querySelector('.programs').classList.remove('disabled');
-});
 
