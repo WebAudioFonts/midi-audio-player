@@ -8,7 +8,7 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 1.2.0
-	Build:   2026-05-23 17:16:00
+	Build:   2026-05-24 22:31:08
 	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/ZmotriN/midi-audio-player/
 	Website: https://zmotrin.github.io/midi-audio-player/
@@ -1675,7 +1675,7 @@
         electronic: { 32: 6, 64: 5, 128: 2, 256: -1, 512: -2, 1024: -1, 2048: 2, 4096: 4, 8192: 5, 16384: 6 }
       };
       const preset = presets[name];
-      if (!preset) throw new Error('Preset EQ inconnu : "'.concat(name, '". Disponibles : ').concat(Object.keys(presets).join(", ")));
+      if (!preset) throw new Error('Preset EQ unkown: "'.concat(name, '". Avaiables: ').concat(Object.keys(presets).join(", ")));
       this.setEQ(preset);
     }
     /**
@@ -2090,7 +2090,12 @@
     async getProgramInstruments(program) {
       const categories = await this.getCategories();
       let instruments = [];
-      await Promise.all(categories.map(async (category) => category.instruments.filter((elm) => elm.program == program).forEach((elm) => instruments = [...instruments, ...elm.presets])));
+      await Promise.all(categories.map(async (category) => category.instruments.filter((elm) => elm.program == program).forEach((elm) => {
+        elm.presets.forEach((p) => {
+          p.instrument = category.name + " / " + elm.name;
+          instruments.push(p);
+        });
+      })));
       return instruments;
     }
     async getPreset(id) {

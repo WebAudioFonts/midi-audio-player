@@ -25,27 +25,20 @@
   <text x="26" y="313" font-family="'Courier New', monospace" font-size="8" fill="#5a8a8a" text-anchor="end">-12</text>
 
   <!-- Niveau actif (du centre vers le haut, à mettre à jour via JS) -->
-  <rect id="level" x="32" y="120" width="6" height="45"
-        rx="2" fill="#1BBFBF" opacity="0.4"/>
+  <rect id="level" x="32" y="120" width="6" height="45" rx="2" fill="#1BBFBF" opacity="0.4"/>
 
   <!-- Bouton / handle -->
   <g id="handle" transform="translate(0, 120)">
-    <rect x="7" y="-11" width="56" height="22" rx="4"
-          fill="#2a2230" stroke="#1BBFBF" stroke-width="1.5"/>
-    <line x1="20" y1="-4" x2="50" y2="-4"
-          stroke="#1BBFBF" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
-    <line x1="20" y1="0"  x2="50" y2="0"
-          stroke="#1BBFBF" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="20" y1="4"  x2="50" y2="4"
-          stroke="#1BBFBF" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+    <rect x="7" y="-11" width="56" height="22" rx="4" fill="#2a2230" stroke="#1BBFBF" stroke-width="1.5"/>
+    <line x1="20" y1="-4" x2="50" y2="-4" stroke="#1BBFBF" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+    <line x1="20" y1="0"  x2="50" y2="0" stroke="#1BBFBF" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="20" y1="4"  x2="50" y2="4" stroke="#1BBFBF" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
   </g>
 
   <!-- Label fréquence en bas -->
-  <text x="35" y="332" font-family="'Courier New', monospace" font-size="9"
-        fill="#c87a6a" text-anchor="middle">1 kHz</text>
+  <text x="35" y="332" font-family="'Courier New', monospace" font-size="9" fill="#c87a6a" text-anchor="middle">1 kHz</text>
 
   <!-- Bordure subtile -->
-  <rect x="1" y="1" width="68" height="358" rx="5"
-        fill="none" stroke="#5a3a38" stroke-width="0.8" opacity="0.4"/>
+  <rect x="1" y="1" width="68" height="358" rx="5" fill="none" stroke="#5a3a38" stroke-width="0.8" opacity="0.4"/>
 
 </svg>

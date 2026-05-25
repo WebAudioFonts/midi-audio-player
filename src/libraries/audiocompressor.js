@@ -170,7 +170,7 @@ export default class AudioCompressor {
             electronic: { 32:6, 64:5, 128:2, 256:-1, 512:-2, 1024:-1, 2048:2, 4096:4, 8192:5, 16384:6 },
         };
         const preset = presets[name];
-        if (!preset) throw new Error(`Preset EQ inconnu : "${name}". Disponibles : ${Object.keys(presets).join(', ')}`);
+        if (!preset) throw new Error(`Preset EQ unkown: "${name}". Avaiables: ${Object.keys(presets).join(', ')}`);
         this.setEQ(preset);
     }
 

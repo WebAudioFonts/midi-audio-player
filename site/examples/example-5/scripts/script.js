@@ -104,7 +104,7 @@ import ProgramChooser from "./libraries/programchooser";
 
 // ctrlEqualizer
 		// console.log(this.player.eqFrequencies);
-		this.eqrack = new EQRack(this.ctrlEqualizer, this.player.eqFrequencies, this.player.eq);
+		this.eqrack = new EQRack(this.ctrlEqualizer, this.player);
 	},
 
 
@@ -129,12 +129,11 @@ import ProgramChooser from "./libraries/programchooser";
 		this.btnPlay.classList.add('active');
 		await this.player.play();
 		this.log(this.player.getCurrentTick() ? "Resume" : "Play");
-
 	},
 
 
 	pause: async function() {
-		if(!this.player.isPlaying()) return log("Not playing");
+		if(!this.player.isPlaying()) return this.log("Not playing");
 		[this.btnStop, this.btnPlay].forEach(btn => btn.classList.remove('active'));
 		this.btnPause.classList.add('active');
 		this.player.pause();
@@ -148,7 +147,6 @@ import ProgramChooser from "./libraries/programchooser";
 		this.player.stop();
 		this.timeline.reset();
 		this.log("Stop");
-
 	},
 
 

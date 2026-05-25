@@ -107,7 +107,12 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     async getProgramInstruments(program) {
         const categories = await this.getCategories();
         let instruments = [];
-        await Promise.all(categories.map(async category => category.instruments.filter(elm => elm.program == program).forEach(elm => instruments = [...instruments, ...elm.presets])));
+        await Promise.all(categories.map(async category => category.instruments.filter(elm => elm.program == program).forEach(elm => {
+            elm.presets.forEach(p => {
+                p.instrument = category.name + ' / ' + elm.name;
+                instruments.push(p);
+            });
+        })));
         return instruments;
     }
 

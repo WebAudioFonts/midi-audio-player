@@ -232,6 +232,63 @@ section:has(.controls) {
   position: relative;
   width: 100%;
   background-color: var(--color-pre);
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+  user-select: none;
+}
+.eqrack__presets {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+}
+.eqrack__presets__preset {
+  position: relative;
+  flex-shrink: 1;
+  flex-grow: 1;
+  justify-content: space-between;
+  text-align: center;
+  cursor: pointer;
+}
+.eqrack__bands {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.eqrack__bands__band {
+  position: relative;
+  aspect-ratio: 7/36;
+  flex-shrink: 1;
+  flex-grow: 1;
+  justify-content: space-between;
+}
+.eqrack__bands__band__input {
+  writing-mode: vertical-lr;
+  position: absolute;
+  display: block;
+  top: 5%;
+  left: 0;
+  height: 81%;
+  aspect-ratio: 1/10;
+  width: 100%;
+  cursor: pointer;
+  opacity: 0;
+  appearance: none;
+  z-index: 2;
+}
+.eqrack__bands__band svg > text {
+  fill: var(--color-third);
+}
+.eqrack__bands__band svg > #handle rect, .eqrack__bands__band svg > #handle line {
+  stroke: var(--color-third);
+}
+.eqrack__bands__band svg > #freq {
+  fill: var(--color-main);
+}
+.eqrack__bands__band svg > #level {
+  fill: var(--color-third);
 }
 
 .karaoke {
@@ -450,7 +507,6 @@ section:has(.controls) {
 }
 .dbvol__slider {
   transform: translateY(var(--y));
-  transition: transform 0.1s ease-out;
   cursor: pointer;
 }
 .dbvol__slider > path:nth-child(3) {

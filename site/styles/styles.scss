@@ -297,7 +297,83 @@ section:has(.controls) {
 	position: relative;
 	width: 100%;
 	background-color: var(--color-pre);
-	// font-size: 4rem;
+	display: flex;
+	flex-direction: column;
+	padding: 0.5rem;
+	user-select: none;
+
+	&__presets {
+
+		position: relative;
+		display: flex;
+		flex-direction: row;
+
+		&__preset {
+			position: relative;
+			flex-shrink: 1;
+			flex-grow: 1;
+			justify-content: space-between;
+			text-align: center;
+			cursor: pointer;
+		}
+	}
+
+	&__bands {
+		position: relative;
+		display: flex;
+		flex-direction: row;
+		gap: 0.5rem;
+		margin-top: 0.5rem;
+
+		&__band {
+			position: relative;
+			aspect-ratio: 7 / 36;
+			flex-shrink: 1;
+			flex-grow: 1;
+			justify-content: space-between;
+
+
+			&__input {
+				writing-mode: vertical-lr;
+				position: absolute;
+				display: block;
+				top: 5%;
+				left: 0;
+				height: 81%;
+				aspect-ratio: 1 / 10;
+				width: 100%;
+				cursor: pointer;
+				opacity: 0;
+				appearance: none;
+				z-index: 2;
+			}
+
+			svg {
+
+				& > text {
+					fill: var(--color-third);
+				}
+
+				& > #handle {
+					rect, line {
+						stroke: var(--color-third);
+					}
+				}
+
+				& > #freq {
+					fill: var(--color-main);
+				}
+
+				& > #level {
+					fill: var(--color-third);
+				}
+
+			}
+
+
+		}
+
+	}
 
 }
 
@@ -558,7 +634,7 @@ section:has(.controls) {
 
 	&__slider {
 		transform: translateY(var(--y));
-		transition: transform 0.1s ease-out; 
+		// transition: transform 0.1s ease-out; 
 		cursor: pointer;
 
 

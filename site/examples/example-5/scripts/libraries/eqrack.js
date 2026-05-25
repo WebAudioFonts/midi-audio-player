@@ -1,16 +1,45 @@
+import EQBand from "./eqband";
+
 export default class EQRack {
 
-	#parent = null;
-	#frequencies = null;
+	#presets = ['flat', 'bass', 'treble', 'vocal', 'loudness', 'classical', 'jazz', 'electronic'];
 
-	constructor(parent, frequencies, states = {}) {
+	#parent = null;
+	#player = null;
+	#bands = {};
+
+	constructor(parent, player) {
 
 		this.#parent = parent;
-		this.#frequencies = frequencies;
+		this.#player = player;
 		
-		console.log(states);
+		this.#create();
 
 		
+	}
+
+
+	#create() {
+		const presets = create('div', 'eqrack__presets');
+		this.#presets.forEach(p => {
+			const preset = presets.create('div', 'eqrack__presets__preset', p.charAt(0).toUpperCase() + p.slice(1));
+			preset.addEventListener('click', () => {
+				console.log(p);
+			});
+
+		});
+
+		const bands = create('div', 'eqrack__bands');
+		const eqs = this.#player.eq;
+		Object.keys(eqs).forEach(freq => {
+			// console.log(freq);
+			this.#bands[freq] = new EQBand(bands, freq, eqs[freq]);
+
+
+		});
+
+
+		this.#parent.replaceChildren(presets, bands);
 	}
 
 

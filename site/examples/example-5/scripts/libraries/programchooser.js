@@ -15,8 +15,11 @@ export default class ProgramChooser {
 		this.#parent = parent;
 		this.#channel = channel;
 		this.#selpreset = selpreset;
-		presets.forEach(preset => preset.name = `${preset.instrument} / ${preset.bank} #${preset.serie + 1}`);
-		this.#presets = presets.sort((a, b) => a.name.localeCompare(b.name));
+		presets.forEach(preset => {
+			const match = preset.id.match(/^([0-9]{3})([0-9]+)_(.*)$/);
+			preset.label = `${preset.name} / ${match[3]} #${+match[2] + 1}`;
+		});
+		this.#presets = presets.sort((a, b) => a.label.localeCompare(b.label));
 		this.#create();
 	}
 
@@ -28,9 +31,9 @@ export default class ProgramChooser {
 	#create() {
 		const container = create('div', 'instrument');
 		this.#select = container.create('select');
-		this.#select.create('option', null, this.#presets[0].category, { disabled: true });
+		this.#select.create('option', null, this.#presets[0].instrument, { disabled: true });
 		this.#presets.forEach(preset => {
-			this.#select.create('option', null, escapeHTML(preset.name), { value: preset.id });
+			this.#select.create('option', null, escapeHTML(preset.label), { value: preset.id });
 		});
 		this.#select.value = this.#selpreset;
 		this.#select.addEventListener('change', () => {
