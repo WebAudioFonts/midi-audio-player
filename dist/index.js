@@ -1603,66 +1603,28 @@ var AudioCompressor = class _AudioCompressor {
   restoreReverb() {
     this.reverb = this.#currentReverbLevel;
   }
-  /**
-   * Applique des gains EQ avec interpolation Bézier cubique entre les bandes.
-   *
-   * @param {Object} gains  Clés = fréquences Hz (parmi les 10 bandes),
-   *                        valeurs = gain en dB [-12 .. +12].
-   *                        Les bandes non spécifiées gardent leur valeur courante.
-   * @param {number} [smoothTime=0.04]  Constante de lissage WebAudio (secondes).
-   *
-   * @example
-   * // Preset "Basses boostées"
-   * eq.setEQ({ 32: 6, 64: 4, 128: 2, 256: 0, 16384: 1 });
-   *
-   * // Preset "Smiley face"
-   * eq.setEQ({ 32: 5, 64: 3, 256: -2, 1024: -4, 2048: -2, 8192: 3, 16384: 5 });
-   */
   setEQ(gains, smoothTime = 0.04) {
-    const freqs = _AudioCompressor.#EQ_FREQUENCIES;
     const now = this.#audioCtx.currentTime;
     const MAX_DB = 12;
-    const targetGains = /* @__PURE__ */ new Map();
-    for (const freq of freqs) {
-      const band = this.#eqBands.get(freq);
-      targetGains.set(freq, band.gain);
-    }
     for (const [key, val] of Object.entries(gains)) {
       const freq = Number(key);
-      if (this.#eqBands.has(freq)) {
-        targetGains.set(freq, Math.max(-MAX_DB, Math.min(MAX_DB, val)));
-      }
-    }
-    const smoothedGains = this.#catmullRomSmooth(freqs, targetGains);
-    for (const freq of freqs) {
       const band = this.#eqBands.get(freq);
-      const dbValue = smoothedGains.get(freq);
+      if (!band) continue;
+      const dbValue = Math.max(-MAX_DB, Math.min(MAX_DB, val));
       band.filter.gain.setTargetAtTime(dbValue, now, smoothTime);
       band.gain = dbValue;
     }
   }
-  /**
-   * Retourne l'état courant de l'EQ.
-   * @returns {Object}  { 32: dB, 64: dB, … 16384: dB }
-   */
   getEQ() {
     const result = {};
     for (const [freq, band] of this.#eqBands) result[freq] = band.gain;
     return result;
   }
-  /**
-   * Remet toutes les bandes à 0 dB.
-   * @param {number} [smoothTime=0.04]
-   */
   resetEQ(smoothTime = 0.04) {
     const flat = {};
     for (const freq of _AudioCompressor.#EQ_FREQUENCIES) flat[freq] = 0;
     this.setEQ(flat, smoothTime);
   }
-  /**
-   * Applique un preset nommé.
-   * @param {'flat'|'bass'|'treble'|'vocal'|'loudness'|'classical'|'jazz'|'electronic'} name
-   */
   setEQPreset(name) {
     const presets = {
       flat: { 32: 0, 64: 0, 128: 0, 256: 0, 512: 0, 1024: 0, 2048: 0, 4096: 0, 8192: 0, 16384: 0 },
@@ -1677,48 +1639,6 @@ var AudioCompressor = class _AudioCompressor {
     const preset = presets[name];
     if (!preset) throw new Error('Preset EQ unkown: "'.concat(name, '". Avaiables: ').concat(Object.keys(presets).join(", ")));
     this.setEQ(preset);
-  }
-  /**
-   * Lisse les gains cibles avec des splines Catmull-Rom en espace log-fréquence.
-   * Retourne une nouvelle Map freq→dB avec les mêmes clés.
-   * @private
-   */
-  #catmullRomSmooth(freqs, targetGains) {
-    const logFreqs = freqs.map((f) => Math.log2(f));
-    const gains = freqs.map((f) => targetGains.get(f));
-    const n = freqs.length;
-    const tangents = gains.map((_, i) => {
-      const prev = i > 0 ? gains[i - 1] : gains[i];
-      const next = i < n - 1 ? gains[i + 1] : gains[i];
-      const dx = i > 0 && i < n - 1 ? logFreqs[i + 1] - logFreqs[i - 1] : i === 0 ? logFreqs[1] - logFreqs[0] : logFreqs[n - 1] - logFreqs[n - 2];
-      return dx === 0 ? 0 : (next - prev) / dx;
-    });
-    const smoothed = /* @__PURE__ */ new Map();
-    for (let i = 0; i < n; i++) {
-      const seg = Math.min(i, n - 2);
-      const t = i === seg ? 0 : 1;
-      const g = this.#hermite(
-        gains[seg],
-        gains[seg + 1],
-        tangents[seg] * (logFreqs[seg + 1] - logFreqs[seg]),
-        tangents[seg + 1] * (logFreqs[seg + 1] - logFreqs[seg]),
-        t
-      );
-      smoothed.set(freqs[i], gains[i]);
-      void g;
-    }
-    for (let i = 1; i < n - 1; i++) {
-      const prev = smoothed.get(freqs[i - 1]);
-      const curr = smoothed.get(freqs[i]);
-      const next = smoothed.get(freqs[i + 1]);
-      smoothed.set(freqs[i], prev * (1 / 6) + curr * (4 / 6) + next * (1 / 6));
-    }
-    return smoothed;
-  }
-  /** Hermite cubique P(t) avec t ∈ [0,1] */
-  #hermite(p0, p1, m0, m1, t) {
-    const t2 = t * t, t3 = t2 * t;
-    return (2 * t3 - 3 * t2 + 1) * p0 + (t3 - 2 * t2 + t) * m0 + (-2 * t3 + 3 * t2) * p1 + (t3 - t2) * m1;
   }
   #bandEqualizer(from, frequency) {
     const filter = this.#audioCtx.createBiquadFilter();
@@ -2010,6 +1930,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     karaokeDelay: 0,
     muteExpression: false,
     maxCharPerLine: 48,
+    eqPreset: "flat",
     presets: { [-1]: -1 }
   };
   constructor(opts = {}) {
@@ -2025,6 +1946,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     };
     this.#audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     this.#compressor = new AudioCompressor(this.#audioCtx, this.#opts.volume, this.#opts.reverb);
+    this.#compressor.setEQPreset(this.#opts.eqPreset);
     if (this.#opts.karaoke) this.#sendKaraokeFrame("intro");
   }
   get catalog() {
@@ -2061,20 +1983,29 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
   get eq() {
     return this.#compressor.getEQ();
   }
+  getEQ() {
+    return this.#compressor.getEQ();
+  }
+  setEQ(gains) {
+    this.#compressor.setEQ(gains);
+  }
+  setEQPreset(name) {
+    this.#compressor.setEQPreset(name);
+  }
   async close() {
     Object.keys(this.#players).forEach((id) => this.#players[id].close());
     await this.#audioCtx.close();
   }
   async getCatalog() {
     if (this.#catalog) return this.#catalog;
-    const cachedata = this.#opts.localCache ? await localStorage.getItem("waf_catalog") : null;
+    const cachedata = this.#opts.localCache ? await sessionStorage.getItem("waf_catalog") : null;
     if (cachedata) this.#catalog = JSON.parse(cachedata);
     else {
       this.#log("Downloading catalog...");
       const response = await fetch("".concat(_MidiAudioPlayer.ENDPOINT, "catalog.json"));
       if (!response.ok) throw new Error("Impossible to download catalog: ".concat(response.status));
       this.#catalog = await response.json();
-      if (this.#opts.localCache) await localStorage.setItem("waf_catalog", JSON.stringify(this.#catalog));
+      if (this.#opts.localCache) await sessionStorage.setItem("waf_catalog", JSON.stringify(this.#catalog));
     }
     const catalogDate = new Date(this.#catalog.updatedAt).getTime();
     const catalogVersion = await indexeddbstorage_default.getItem("waf_catalog_version") || 1;

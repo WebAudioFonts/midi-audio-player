@@ -47,6 +47,7 @@ import ProgramChooser from "./libraries/programchooser";
 		presetAuto: true,
 		localCache: true,
 		karaoke: true,
+		eqPreset: 'electronic',
 		// muteExpression: true,
 		// preferred: ["JCLive", "LesPaul", "Chaos"],
 
@@ -102,8 +103,6 @@ import ProgramChooser from "./libraries/programchooser";
 		this.player.on('karaoke', evt => this.karaoke(evt));
 		this.player.on('channelState', async channels => Object.keys(channels).map(async channel => this.programs[channel].setActive(channels[channel])));
 
-// ctrlEqualizer
-		// console.log(this.player.eqFrequencies);
 		this.eqrack = new EQRack(this.ctrlEqualizer, this.player);
 	},
 

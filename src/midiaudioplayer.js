@@ -39,6 +39,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         karaokeDelay: 0,
         muteExpression: false,
         maxCharPerLine: 48,
+        eqPreset: 'flat',
         presets: { [-1]: -1 },
 	};
 
@@ -56,6 +57,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         };
 		this.#audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         this.#compressor = new AudioCompressor(this.#audioCtx, this.#opts.volume, this.#opts.reverb);
+        this.#compressor.setEQPreset(this.#opts.eqPreset);
         if(this.#opts.karaoke) this.#sendKaraokeFrame('intro');
 	}
 
@@ -70,6 +72,9 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     set muteExpression(val) { this.#opts.muteExpression = Boolean(val); }
     get eqFrequencies() { return this.#compressor.eqFrequencies; }
     get eq() { return this.#compressor.getEQ(); }
+    getEQ() { return this.#compressor.getEQ(); }
+    setEQ(gains) { this.#compressor.setEQ(gains); }
+    setEQPreset(name) { this.#compressor.setEQPreset(name); }
 
 
     async close() {
@@ -80,14 +85,14 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
     async getCatalog() {
         if(this.#catalog) return this.#catalog;
-        const cachedata = this.#opts.localCache ? await localStorage.getItem('waf_catalog') : null;
+        const cachedata = this.#opts.localCache ? await sessionStorage.getItem('waf_catalog') : null;
         if (cachedata) this.#catalog = JSON.parse(cachedata);
         else {
             this.#log(`Downloading catalog...`);
             const response = await fetch(`${MidiAudioPlayer.ENDPOINT}catalog.json`);
             if (!response.ok) throw new Error(`Impossible to download catalog: ${response.status}`);
             this.#catalog = await response.json();
-            if(this.#opts.localCache) await localStorage.setItem('waf_catalog', JSON.stringify(this.#catalog));
+            if(this.#opts.localCache) await sessionStorage.setItem('waf_catalog', JSON.stringify(this.#catalog));
         }
         const catalogDate = new Date(this.#catalog.updatedAt).getTime();
         const catalogVersion = await indexedDbStorage.getItem(`waf_catalog_version`) || 1;

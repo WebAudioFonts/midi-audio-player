@@ -315,6 +315,15 @@ section:has(.controls) {
 			justify-content: space-between;
 			text-align: center;
 			cursor: pointer;
+			font-weight: 500;
+			transition: color 50ms, transform 50ms;
+
+			&:hover {
+				color: var(--color-third);
+				transform: scale(1.1);
+				// font-weight: 700;
+			}
+
 		}
 	}
 

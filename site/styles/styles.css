@@ -249,6 +249,12 @@ section:has(.controls) {
   justify-content: space-between;
   text-align: center;
   cursor: pointer;
+  font-weight: 500;
+  transition: color 50ms, transform 50ms;
+}
+.eqrack__presets__preset:hover {
+  color: var(--color-third);
+  transform: scale(1.1);
 }
 .eqrack__bands {
   position: relative;
