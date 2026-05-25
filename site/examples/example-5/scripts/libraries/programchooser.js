@@ -9,11 +9,13 @@ export default class ProgramChooser {
 	#currentAnimation = null;
 	#select = null;
 	#presetCallback = null;
+	#program = null;
 
 
-	constructor(parent, channel, presets, selpreset) {
+	constructor(parent, channel, program, presets, selpreset) {
 		this.#parent = parent;
 		this.#channel = channel;
+		this.#program = program;
 		this.#selpreset = selpreset;
 		presets.forEach(preset => {
 			const match = preset.id.match(/^([0-9]{3})([0-9]+)_(.*)$/);
@@ -23,9 +25,7 @@ export default class ProgramChooser {
 		this.#create();
 	}
 
-	set presetCallback(val) {
-		this.#presetCallback = val;
-	}
+	set presetCallback(val) { this.#presetCallback = val; }
 
 
 	#create() {
@@ -40,6 +40,7 @@ export default class ProgramChooser {
 			if(typeof this.#presetCallback === 'function') this.#presetCallback(this.#select.value, this.#channel);
 		});
 		container.create('div', 'program', `#${this.#channel}`);
+		container.create('div', `inst gm-${(Math.floor(this.#program / 8) + 1).toString().padStart(2, '0')}`);
 		this.#light = container.create('div', 'light');
 		this.#parent.appendChild(container);
 	}
@@ -53,7 +54,6 @@ export default class ProgramChooser {
 				[{ '--light-opacity': 0 }, { '--light-opacity': 1 }],
 				{ duration: 5, easing: 'ease-out', fill: 'forwards' }
 			);
-
 		} else if (!active && this.#active) {
 			this.#active = false;
 			if (this.#currentAnimation) this.#currentAnimation.cancel();

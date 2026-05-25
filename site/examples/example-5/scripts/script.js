@@ -168,7 +168,7 @@ import ProgramChooser from "./libraries/programchooser";
 		const parent = create('div', 'instruments');
 		await Promise.all(Object.keys(channels).map(async channel => this.presets[channels[channel].preset.program] = await this.player.getProgramInstruments(channels[channel].preset.program)));
 		await Promise.all(Object.keys(channels).map(async channel => {
-			this.programs[channel] = new ProgramChooser(parent, channel, this.presets[channels[channel].preset.program], channels[channel].preset.id);
+			this.programs[channel] = new ProgramChooser(parent, channel, channels[channel].preset.program, this.presets[channels[channel].preset.program], channels[channel].preset.id);
 			this.programs[channel].presetCallback = presetCallback;
 		}));
 		await new Promise(requestAnimationFrame);
