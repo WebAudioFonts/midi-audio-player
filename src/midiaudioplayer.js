@@ -14,18 +14,19 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     static REFERENCE_GAIN  = 0.15;
     static KARAOKE_CHANNEL = 0;
 
-    #catalog       = null;
-	#audioCtx      = null;
-	#compressor    = null;
-    #vocalChannel  = null;
-    #activeNotes   = {};
-    #channelStates = {};
-    #instruments   = {};
-    #players       = {};
-    #channels      = {};
-    #lyrics        = null;
-    #haveLyrics    = false;
-    #title         = '';
+    #catalog        = null;
+	#audioCtx       = null;
+	#compressor     = null;
+    #vocalChannel   = null;
+    #activeNotes    = {};
+    #channelStates  = {};
+    #instruments    = {};
+    #players        = {};
+    #channels       = {};
+    #channelVolumes = {};
+    #lyrics         = null;
+    #haveLyrics     = false;
+    #title          = '';
 
 	#opts = {
         volume: 0.7,
@@ -75,6 +76,12 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     getEQ() { return this.#compressor.getEQ(); }
     setEQ(gains) { this.#compressor.setEQ(gains); }
     setEQPreset(name) { this.#compressor.setEQPreset(name); }
+
+    setChannelVolume(channel, volume) {
+
+        this.#channelVolumes[channel] = volume;
+
+    }
 
 
     async close() {
@@ -173,6 +180,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         this.#log('Loading instruments...');
         this.#channels = await this.#getInstruments();
         this.#channelStates = Object.keys(this.#channels).reduce((acc, key) => ({ ...acc, [key]: false }), {});
+        this.#channelVolumes = Object.keys(this.#channels).reduce((acc, key) => ({ ...acc, [key]: 1.0 }), {});
         const uniqueInstruments = await this.#getUniqueInstruments();
         if(!Object.values(this.#channels).length) this.#log("Error: no instrument found");
         if(this.#opts.presetRandom || this.#opts.presetAuto) await this.getCatalog();
@@ -671,8 +679,9 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
                 if (event.channel == this.#vocalChannel && this.#opts.muteExpression) return;
                 if (event.velocity > 0 && event.velocity <= 127) {
                     this.#stopNote(event.channel, event.noteNumber);
+                    if(this.#channelVolumes[event.channel] == 0) return;
                     const noteVelocityRatio = event.velocity / 127;
-                    const finalVol = MidiAudioPlayer.REFERENCE_GAIN * Math.pow(noteVelocityRatio, 2);
+                    const finalVol = MidiAudioPlayer.REFERENCE_GAIN * Math.pow(noteVelocityRatio, 2) * this.#channelVolumes[event.channel];
                     const envelope = this.#players[event.channel]?.queueWaveTable(0, event.noteNumber, 2, finalVol);
                     if (envelope) this.#addNote(event.channel, event.noteNumber, envelope)
                 } else {

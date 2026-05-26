@@ -161,7 +161,7 @@ import ProgramChooser from "./libraries/programchooser";
 	},
 
 
-	loadPrograms: async function(presetCallback) {
+	loadPrograms: async function(presetCallback, volumeCallback) {
 		this.presets = {};
 		this.programs = {};
 		const channels = this.player.channels;
@@ -170,6 +170,7 @@ import ProgramChooser from "./libraries/programchooser";
 		await Promise.all(Object.keys(channels).map(async channel => {
 			this.programs[channel] = new ProgramChooser(parent, channel, channels[channel].preset.program, this.presets[channels[channel].preset.program], channels[channel].preset.id);
 			this.programs[channel].presetCallback = presetCallback;
+			this.programs[channel].volumeCallback = volumeCallback;
 		}));
 		await new Promise(requestAnimationFrame);
 		this.ctrlPrograms.replaceChildren(parent);
@@ -199,7 +200,10 @@ import ProgramChooser from "./libraries/programchooser";
 
 
 	presetLoaded: async function(instruments) {
-		await this.loadPrograms((preset, channel) => busy(this.player.loadPreset(preset, channel)));
+		await this.loadPrograms(
+			(preset, channel) => busy(this.player.loadPreset(preset, channel)),
+			(volume, channel) => this.player.setChannelVolume(channel, volume)
+		);
 		if(!this.firstPlay) {
 			this.play();
 			this.log('Autoplay');

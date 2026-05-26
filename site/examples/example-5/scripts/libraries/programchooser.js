@@ -1,3 +1,5 @@
+import Dial from "./dial";
+
 export default class ProgramChooser {
 
 	#parent = null;
@@ -9,7 +11,9 @@ export default class ProgramChooser {
 	#currentAnimation = null;
 	#select = null;
 	#presetCallback = null;
+	#volumeCallback = null;
 	#program = null;
+	#dial = null;
 
 
 	constructor(parent, channel, program, presets, selpreset) {
@@ -26,6 +30,7 @@ export default class ProgramChooser {
 	}
 
 	set presetCallback(val) { this.#presetCallback = val; }
+	set volumeCallback(val) { this.#volumeCallback = val; }
 
 
 	#create() {
@@ -42,6 +47,11 @@ export default class ProgramChooser {
 		container.create('div', 'program', `#${this.#channel}`);
 		container.create('div', `inst gm-${(Math.floor(this.#program / 8) + 1).toString().padStart(2, '0')}`);
 		this.#light = container.create('div', 'light');
+		this.#dial = new Dial(container, 'instrument', 1 * 0.75, val => {
+			if(typeof this.#volumeCallback === 'function') this.#volumeCallback((val / 0.75), this.#channel);
+		});
+
+
 		this.#parent.appendChild(container);
 	}
 

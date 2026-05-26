@@ -1915,6 +1915,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
   #instruments = {};
   #players = {};
   #channels = {};
+  #channelVolumes = {};
   #lyrics = null;
   #haveLyrics = false;
   #title = "";
@@ -1991,6 +1992,9 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
   }
   setEQPreset(name) {
     this.#compressor.setEQPreset(name);
+  }
+  setChannelVolume(channel, volume) {
+    this.#channelVolumes[channel] = volume;
   }
   async close() {
     Object.keys(this.#players).forEach((id) => this.#players[id].close());
@@ -2073,6 +2077,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     this.#log("Loading instruments...");
     this.#channels = await this.#getInstruments();
     this.#channelStates = Object.keys(this.#channels).reduce((acc, key) => ({ ...acc, [key]: false }), {});
+    this.#channelVolumes = Object.keys(this.#channels).reduce((acc, key) => ({ ...acc, [key]: 1 }), {});
     const uniqueInstruments = await this.#getUniqueInstruments();
     if (!Object.values(this.#channels).length) this.#log("Error: no instrument found");
     if (this.#opts.presetRandom || this.#opts.presetAuto) await this.getCatalog();
@@ -2522,8 +2527,9 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
         if (event.channel == this.#vocalChannel && this.#opts.muteExpression) return;
         if (event.velocity > 0 && event.velocity <= 127) {
           this.#stopNote(event.channel, event.noteNumber);
+          if (this.#channelVolumes[event.channel] == 0) return;
           const noteVelocityRatio = event.velocity / 127;
-          const finalVol = _MidiAudioPlayer.REFERENCE_GAIN * Math.pow(noteVelocityRatio, 2);
+          const finalVol = _MidiAudioPlayer.REFERENCE_GAIN * Math.pow(noteVelocityRatio, 2) * this.#channelVolumes[event.channel];
           const envelope = this.#players[event.channel]?.queueWaveTable(0, event.noteNumber, 2, finalVol);
           if (envelope) this.#addNote(event.channel, event.noteNumber, envelope);
         } else {
