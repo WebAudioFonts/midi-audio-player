@@ -245,6 +245,10 @@ section:has(.controls) {
   row-gap: 1rem;
 }
 
+section:has(.karaoke) {
+  display: none;
+}
+
 .eqrack {
   position: relative;
   width: 100%;

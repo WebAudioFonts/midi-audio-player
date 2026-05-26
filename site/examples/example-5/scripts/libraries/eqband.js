@@ -46,7 +46,7 @@ export default class EQBand {
 		svg += `<line x1="20" y1="0"  x2="50" y2="0" stroke-width="1.5" stroke-linecap="round"/>`;
 		svg += `<line x1="20" y1="4"  x2="50" y2="4" stroke-width="1" stroke-linecap="round" opacity="0.5"/>`;
 		svg += `</g>`;
-		svg += `<text id="freq" x="35" y="332" font-family="'Courier New', monospace" font-size="9" fill="#c87a6a" text-anchor="middle">${this.#freq} kHz</text>`;
+		svg += `<text id="freq" x="35" y="340" font-family="'Courier New', monospace" font-size="9" fill="#c87a6a" text-anchor="middle">${this.#freq} kHz</text>`;
 		svg += `<rect x="1" y="1" width="68" height="358" rx="5" fill="none" stroke="#5a3a38" stroke-width="0.8" opacity="0.4"/>`;
 		svg += `</svg>`;
 		container.innerHTML = svg;

@@ -11,7 +11,6 @@ export default class Dial {
 	#t = 0;
 
 
-
 	constructor(parent, className, t, callback) {
 		this.#parent = parent;
 		this.#className = className; 
@@ -26,16 +25,12 @@ export default class Dial {
 		this.#dial = this.#wrapper.create('div', 'dial');
 		this.#dial.create('div', 'dial-track');
 		// this.#dial.create('div', 'dial-dot');
-
-
 		this.#dial.addEventListener('mousedown', e => this.#mousedown(e));
 		this.#dial.addEventListener('touchstart', e => this.#touchstart(e), { passive: false });
 		window.addEventListener('mousemove', e => this.#mousemove(e));
 		window.addEventListener('mouseup', e => this.#mouseup(e));
 		window.addEventListener('touchmove', e => this.#touchmove(e), { passive: false });
 		window.addEventListener('touchend', () => { this.#dragging = false; });
-
-
 		this.#parent.append(this.#wrapper);
 	}
 
@@ -67,7 +62,7 @@ export default class Dial {
 	#mousemove(e) {
 		if (!this.#dragging) return;
 		const dy = e.clientY - this.#startY;
-		this.#setT(this.#startT + dy / 180);
+		this.#setT(this.#startT - dy / 180);
 	}
 
 
@@ -80,9 +75,7 @@ export default class Dial {
 	#touchmove(e) {
 		if (!this.#dragging) return;
 		const dy = e.touches[0].clientY - this.#startY;
-		this.#setT(this.#startT + dy / 180);
+		this.#setT(this.#startT - dy / 180);
 	}
-
-
 
 }

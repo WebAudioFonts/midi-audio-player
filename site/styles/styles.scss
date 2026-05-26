@@ -312,6 +312,10 @@ section:has(.controls) {
 	row-gap: 1rem;
 }
 
+section:has(.karaoke) {
+	display: none;
+}
+
 
 .eqrack {
 	position: relative;
@@ -826,7 +830,6 @@ section:has(.instruments) {
 
 
 		& > select {
-			// appearance: none;
 			width: 100%;
 			font-family: var(--font-family);
 			background-color: color.adjust($color-main, $alpha: -0.85);
@@ -837,7 +840,6 @@ section:has(.instruments) {
 			padding: 0.1rem;
 
 			&::-webkit-scrollbar {
-				// border-radius: 0.2rem;
 				height: 0.2rem;
 			}
 
@@ -970,27 +972,6 @@ section:has(.instruments) {
 
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 iframe[src*="codepen.io"] {

@@ -8,7 +8,6 @@ import ProgramChooser from "./libraries/programchooser";
 
 
 ({
-
 	song: '../../data/closer.mid',
 	firstPlay: true,
 
@@ -30,7 +29,6 @@ import ProgramChooser from "./libraries/programchooser";
 	ctrlKaraoke: null,
 	ctrlPrograms: null,
 	
-
 	timeline: null,
 	dbmeter: null,
 	volslider: null,
@@ -44,13 +42,12 @@ import ProgramChooser from "./libraries/programchooser";
 		volume: localStorage.getItem('waf_volume') || 0.7,
 		reverb: 0.3,
 		presetRandom: true,
-		presetAuto: true,
 		localCache: true,
 		karaoke: true,
 		eqPreset: 'electronic',
 		// muteExpression: true,
-		// preferred: ["JCLive", "LesPaul", "Chaos"],
-
+		// preferred: ["LesPaul", "AirFont380"],
+		presets: ['1283_RealFont'],
 	},
 
 
@@ -59,12 +56,9 @@ import ProgramChooser from "./libraries/programchooser";
 		await this.initUI();
 		await this.initPlayer();
 		await this.startWorker();
-
 		const response = await fetch(this.song);
 		const buffer = await response.arrayBuffer();
 		await this.player.load(buffer);
-
-
 	},
 
 
@@ -80,17 +74,13 @@ import ProgramChooser from "./libraries/programchooser";
 		this.ctrlEqualizer = document.querySelector('.eqrack');
 		this.ctrlKaraoke = document.querySelector('.karaoke');
 		this.ctrlPrograms = document.querySelector('.programs');
-
 		this.btnPlay.addEventListener('click', async () => await this.play());
 		this.btnPause.addEventListener('click', async () => await this.pause());
 		this.btnStop.addEventListener('click', async () => await this.stop());
-
 		this.volslider = new Slider(this.ctrlVolume, this.opts.volume, vol => this.setVolume(vol));
 		this.timeline = new Timeline(this.ctrlWaveform, sec => this.skipTo(sec));
 		this.dbmeter = new DBMeter(this.ctrlMeter);
-		this.dndzone = new DNDZone(document.querySelector('.dnd'), { onFileDrop: file => this.drop(file) });
-
-		
+		this.dndzone = new DNDZone(document.querySelector('.dnd'), { onFileDrop: file => this.drop(file) });	
 	},
 
 
@@ -102,7 +92,6 @@ import ProgramChooser from "./libraries/programchooser";
 		this.player.on('endOfFile', () => this.endOfFile());
 		this.player.on('karaoke', evt => this.karaoke(evt));
 		this.player.on('channelState', async channels => Object.keys(channels).map(async channel => this.programs[channel].setActive(channels[channel])));
-
 		this.eqrack = new EQRack(this.ctrlEqualizer, this.player);
 	},
 
@@ -156,8 +145,9 @@ import ProgramChooser from "./libraries/programchooser";
 
 
 	skipTo: async function(sec) {
+		const wasPlaying = this.player.isPlaying();
 		await this.player.skipToSeconds(sec);
-		if(!this.player.isPlaying()) this.play();
+		if(!wasPlaying) this.play();
 	},
 
 
@@ -195,6 +185,7 @@ import ProgramChooser from "./libraries/programchooser";
 		this.log("Generating waveform...");
 		const svgCode = await this.player.generateWaveformSVG();
 		this.timeline.load(svgCode, this.info.duration);
+		this.ctrlKaraoke.parentElement.style.display = this.info.karaoke ? 'block' : 'none';
 		this.ctrlKaraoke.style.setProperty('--title', `"${this.info.title}"`);
 	},
 
