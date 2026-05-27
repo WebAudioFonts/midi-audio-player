@@ -795,7 +795,11 @@ section:has(.instruments) {
 
 	.program {
 		color: var(--color-third);
-		filter: drop-shadow(0 0 0.75rem black);
+		filter: drop-shadow(0 0 0.3rem black);
+
+		&.vocal {
+			filter: drop-shadow(0 0 0.2rem black) drop-shadow(0 0 0.3rem crimson) drop-shadow(0 0 0.45rem white);
+		}
 	}
 
 	& > .instrument {
@@ -811,7 +815,7 @@ section:has(.instruments) {
 			background-position: center center;
 			background-repeat: no-repeat;
 			background-size: contain;
-			filter: drop-shadow(0 0 0.75rem black);
+			filter: drop-shadow(0 0 0.3rem black);
 
 			&.gm-00 { background-image: var(--gm-inst-00); }
 			&.gm-01 { background-image: var(--gm-inst-01); }

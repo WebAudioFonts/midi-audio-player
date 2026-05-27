@@ -8,7 +8,7 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 2.0.0
-	Build:   2026-05-27 00:24:47
+	Build:   2026-05-27 00:45:56
 	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/ZmotriN/midi-audio-player/
 	Website: https://zmotrin.github.io/midi-audio-player/
@@ -1798,6 +1798,8 @@
     #channels = {};
     #channelVolumes = {};
     #presetMap = {};
+    #bufferHash = null;
+    #presetTimer = null;
     #presetMapThread = null;
     #lyrics = null;
     #haveLyrics = false;
@@ -1874,6 +1876,7 @@
     }
     setChannelVolume(channel, volume) {
       this.#channelVolumes[channel] = volume;
+      this.#setupChange();
     }
     async #mapPresets() {
       await Promise.all(this.#opts.presets.map(async (p) => {
@@ -1961,6 +1964,7 @@
       this.#presetMap[presetInfo.program] = presetInfo;
       const preset = await this.getPreset(presetId);
       this.#players[channel].preset = preset;
+      this.#setupChange();
     }
     async load(content, setup) {
       if (typeof content === "string") {
@@ -1973,6 +1977,7 @@
         const response = await fetch(setup);
         setup = await response.json();
       }
+      this.#bufferHash = await this.hashBuffer(content);
       await this.#presetMapThread;
       if (this.isPlaying()) this.stop();
       this.#clearActiveNotes();
@@ -2035,10 +2040,11 @@
       this.#log("Initializing instrument states...");
       await this.#initInstrumentStates();
       await this.triggerPlayerEvent("presetsLoaded", this.#instruments);
+      await this.#setupChange();
       this.#log("Player ready");
     }
     async getSongSetup() {
-      let setup = { presets: {}, volumes: {} };
+      let setup = { hash: this.#bufferHash, presets: {}, volumes: {} };
       Object.keys(this.#players).map(async (channel) => setup.presets[channel] = this.#players[channel].preset.id);
       setup.volumes = this.#channelVolumes;
       return setup;
@@ -2146,13 +2152,26 @@
     // ----------------------------------------------------------------------------------------------------------------------
     // ----------------------------------------------------------------------------------------------------------------------
     // ----------------------------------------------------------------------------------------------------------------------
+    async hashBuffer(arrayBuffer, algorithm = "SHA-256") {
+      const hashBuffer = await crypto.subtle.digest(algorithm, arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+    async #setupChange() {
+      if (this.#presetTimer) clearTimeout(this.#presetTimer);
+      this.#presetTimer = setTimeout(async () => {
+        const setup = await this.getSongSetup();
+        queueMicrotask(() => this.triggerPlayerEvent("setupChange", setup));
+      }, 1e3);
+    }
     async triggerPlayerEvent(playerEvent, data) {
       if (playerEvent == "fileLoaded") return;
       else if (playerEvent == "computed") {
-        if (this.#opts.muteExpression) this.#vocalChannel = await this.#detectKaraokeVocalChannel();
+        this.#vocalChannel = await this.#detectKaraokeVocalChannel();
         super.triggerPlayerEvent(playerEvent, {
           title: this.#title,
           karaoke: this.#haveLyrics,
+          vocalChannel: this.#vocalChannel,
           tempo: this.tempo,
           division: this.division,
           duration: this.getSongTime(),

@@ -92,6 +92,7 @@ import ProgramChooser from "./libraries/programchooser";
 		this.player.on('presetsLoaded', instruments => this.presetLoaded(instruments));
 		this.player.on('endOfFile', () => this.endOfFile());
 		this.player.on('karaoke', evt => this.karaoke(evt));
+		this.player.on('setupChange', setup => this.setupChange(setup));
 		this.player.on('channelState', async channels => Object.keys(channels).map(async channel => this.programs[channel].setActive(channels[channel])));
 		this.eqrack = new EQRack(this.ctrlEqualizer, this.player);
 	},
@@ -160,7 +161,7 @@ import ProgramChooser from "./libraries/programchooser";
 		const parent = create('div', 'instruments');
 		await Promise.all(Object.keys(channels).map(async channel => this.presets[channels[channel].preset.program] = await this.player.getProgramInstruments(channels[channel].preset.program)));
 		await Promise.all(Object.keys(channels).map(async channel => {
-			this.programs[channel] = new ProgramChooser(parent, channel, channels[channel].preset.program, this.presets[channels[channel].preset.program], channels[channel].preset.id, volumes[channel]);
+			this.programs[channel] = new ProgramChooser(parent, channel, channels[channel].preset.program, this.presets[channels[channel].preset.program], channels[channel].preset.id, volumes[channel], channel == this.info.vocalChannel);
 			this.programs[channel].presetCallback = presetCallback;
 			this.programs[channel].volumeCallback = volumeCallback;
 		}));
@@ -239,12 +240,19 @@ import ProgramChooser from "./libraries/programchooser";
 			this.filename = file.name.replace(/\.[a-z]+$/i, '');
 			if(this.player.isPlaying()) this.player.stop(true);
 			const buffer = await file.arrayBuffer();
-			await this.player.load(buffer);
+			const hash = await this.player.hashBuffer(buffer);
+			const setup = localStorage.getItem(`waf_setup_${hash}`);
+			await this.player.load(buffer, JSON.parse(setup));
 		} catch(e) {
 			console.error(e);
 			this.log(`Error: ${e}`);
 			this.unfreeze();
 		}
+	},
+
+
+	setupChange: async function(setup) {
+		localStorage.setItem(`waf_setup_${setup.hash}`, JSON.stringify(setup));
 	},
 
 
@@ -276,4 +284,3 @@ import ProgramChooser from "./libraries/programchooser";
 
 
 }).init();
-

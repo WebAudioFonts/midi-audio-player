@@ -2,7 +2,6 @@ import MidiPlayer from 'midi-player-js';
 import WebAudioFontPlayer from 'webaudiofontplayer';
 import AudioCompressor from './libraries/audiocompressor';
 import indexedDbStorage from './libraries/indexeddbstorage';
-// import DefaultPreset from "./presets/defaultpreset.json";
 
 const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
@@ -25,6 +24,8 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     #channels        = {};
     #channelVolumes  = {};
     #presetMap       = {};
+    #bufferHash      = null;
+    #presetTimer     = null;
     #presetMapThread = null;
     #lyrics          = null;
     #haveLyrics      = false;
@@ -72,7 +73,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     getEQ() { return this.#compressor.getEQ(); }
     setEQ(gains) { this.#compressor.setEQ(gains); }
     setEQPreset(name) { this.#compressor.setEQPreset(name); }
-    setChannelVolume(channel, volume) { this.#channelVolumes[channel] = volume; }
+    setChannelVolume(channel, volume) { this.#channelVolumes[channel] = volume; this.#setupChange(); }
 
 
     async #mapPresets() {
@@ -175,6 +176,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         this.#presetMap[presetInfo.program] = presetInfo;
         const preset = await this.getPreset(presetId);
         this.#players[channel].preset = preset;
+        this.#setupChange();
     }
 
 
@@ -189,6 +191,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
             const response = await fetch(setup);
             setup = await response.json();
         }
+        this.#bufferHash = await this.hashBuffer(content);
         await this.#presetMapThread;
 		if(this.isPlaying()) this.stop();
 		this.#clearActiveNotes();
@@ -258,12 +261,14 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         this.#log("Initializing instrument states...");
         await this.#initInstrumentStates();
         await this.triggerPlayerEvent('presetsLoaded', this.#instruments);
+        await this.#setupChange();
         this.#log("Player ready");
+        
 	}
 
 
     async getSongSetup() {
-		let setup = { presets: {}, volumes: {} };
+		let setup = { hash: this.#bufferHash, presets: {}, volumes: {} };
         Object.keys(this.#players).map(async channel => setup.presets[channel] = this.#players[channel].preset.id);
 		setup.volumes = this.#channelVolumes;
         return setup;
@@ -392,13 +397,31 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     // ----------------------------------------------------------------------------------------------------------------------
     // ----------------------------------------------------------------------------------------------------------------------
 
+
+    async hashBuffer(arrayBuffer, algorithm = 'SHA-256') {
+        const hashBuffer = await crypto.subtle.digest(algorithm, arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+
+    async #setupChange() {
+        if(this.#presetTimer) clearTimeout(this.#presetTimer);
+        this.#presetTimer = setTimeout(async () => {
+            const setup = await this.getSongSetup();
+            queueMicrotask(() => this.triggerPlayerEvent('setupChange', setup));
+        }, 1000);
+    }
+
+
     async triggerPlayerEvent(playerEvent, data) {
         if(playerEvent == 'fileLoaded') return;
         else if(playerEvent == 'computed') {
-            if(this.#opts.muteExpression) this.#vocalChannel = await this.#detectKaraokeVocalChannel();
+            this.#vocalChannel = await this.#detectKaraokeVocalChannel();
             super.triggerPlayerEvent(playerEvent, {
                 title: this.#title,
                 karaoke: this.#haveLyrics,
+                vocalChannel: this.#vocalChannel,
                 tempo: this.tempo,
                 division: this.division,
                 duration: this.getSongTime(),

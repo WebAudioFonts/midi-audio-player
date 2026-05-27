@@ -1,7 +1,7 @@
 {
   "name": "midi-audio-player",
   "version": "2.0.0",
-  "description": "Javascript Midi Audio Player for WebAudioFonts",
+  "description": "Real MIDI playback in the browser — powered by Web Audio API and WebAudioFont.",
   "keywords": [
     "midi",
     "midi-player",
@@ -14,13 +14,13 @@
     "web-audio-api",
     "midi-playback"
   ],
-  "homepage": "https://zmotrin.github.io/midi-audio-player/",
+  "homepage": "https://WebAudioFonts.github.io/",
   "bugs": {
-    "url": "https://github.com/ZmotriN/midi-audio-player/issues"
+    "url": "https://github.com/WebAudioFonts/midi-audio-player/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ZmotriN/midi-audio-player.git"
+    "url": "git+https://github.com/WebAudioFonts/midi-audio-player.git"
   },
   "license": "MIT",
   "author": "Maxime Larrivée-Roy",
@@ -34,6 +34,7 @@
     "bin",
     "src",
     "index.js",
+    "index.d.ts",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
