@@ -782,6 +782,7 @@ section:has(.karaoke) {
 
 section:has(.instruments) {
 	background-color: var(--color-pre);
+	user-select: none;
 }
 
 .instruments {
@@ -896,6 +897,7 @@ section:has(.instruments) {
 			background-repeat: no-repeat;
 			background-position: right 0.3rem bottom;
 			background-size: 1rem;
+			user-select: none;
 		
 			padding-right: 1.5rem;
 			&::-webkit-scrollbar {

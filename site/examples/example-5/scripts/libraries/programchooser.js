@@ -25,7 +25,6 @@ export default class ProgramChooser {
 		this.#selpreset = selpreset;
 		this.#volume = volume;
 		this.#isVocal = isVocal;
-
 		presets.forEach(preset => {
 			const match = preset.id.match(/^([0-9]{3})([0-9]+)_(.*)$/);
 			preset.label = `${preset.name} / ${match[3]} #${+match[2] + 1}`;
@@ -76,6 +75,5 @@ export default class ProgramChooser {
 			);
 		}
 	}
-
 
 }

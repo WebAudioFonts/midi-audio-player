@@ -3043,38 +3043,42 @@
     }
     async #detectKaraokeVocalChannel() {
       const lyrics = await this.#extractLyrics();
-      if (!lyrics || !lyrics.paragraphs || lyrics.paragraphs.length === 0) return null;
-      const textTicks = [];
-      lyrics.paragraphs.forEach((p) => {
-        p.lines.forEach((l) => {
-          l.blocks.forEach((b) => {
-            textTicks.push(b.tick);
-          });
-        });
-      });
+      if (!lyrics?.paragraphs?.length) return null;
+      const textTicks = lyrics.paragraphs.flatMap((p) => p.lines.flatMap((l) => l.blocks.map((b) => b.tick)));
       if (textTicks.length === 0) return null;
+      const tickTolerance = this.division ? this.division / 2 : 48;
+      const VOCAL_MIN = 48;
+      const VOCAL_MAX = 84;
       const channelsToScan = Object.keys(this.#channels).map(Number).filter((chan) => chan !== 10);
       let bestChannel = null;
-      let maxMatches = 0;
-      const tickTolerance = this.division ? this.division / 4 : 24;
-      channelsToScan.forEach((channel) => {
-        let matches = 0;
-        const channelNotes = this.events.flatMap(
+      let bestScore = -Infinity;
+      for (const channel of channelsToScan) {
+        const notes = this.events.flatMap(
           (track) => track.filter(
-            (event) => event.name === "Note on" && event.velocity > 0 && event.channel === channel
+            (e) => e.name === "Note on" && e.velocity > 0 && e.channel === channel
           )
         );
-        textTicks.forEach((textTick) => {
-          const hasMatchingNote = channelNotes.some((note) => Math.abs(note.tick - textTick) <= tickTolerance);
-          if (hasMatchingNote) matches++;
-        });
-        if (matches > maxMatches) {
-          maxMatches = matches;
+        if (notes.length === 0) continue;
+        const aligned = textTicks.filter(
+          (t) => notes.some((n) => Math.abs(n.tick - t) <= tickTolerance)
+        ).length;
+        const alignmentScore = aligned / textTicks.length;
+        const notesInRange = notes.filter((n) => n.noteNumber >= VOCAL_MIN && n.noteNumber <= VOCAL_MAX);
+        const rangeScore = notesInRange.length / notes.length;
+        if (rangeScore < 0.3) continue;
+        const sorted = [...notes].sort((a, b) => a.tick - b.tick);
+        const minGap = this.division / 8 || 6;
+        const poly = sorted.filter((n, i) => i > 0 && Math.abs(n.tick - sorted[i - 1].tick) < minGap).length;
+        const monophonyScore = 1 - poly / Math.max(notes.length - 1, 1);
+        const densityRatio = notes.length / Math.max(textTicks.length, 1);
+        const densityScore = densityRatio < 0.3 ? densityRatio / 0.3 : densityRatio > 5 ? Math.max(0, 1 - (densityRatio - 5) / 10) : 1;
+        const score = alignmentScore * 0.45 + rangeScore * 0.35 + monophonyScore * 0.15 + densityScore * 0.05;
+        if (score > bestScore) {
+          bestScore = score;
           bestChannel = channel;
         }
-      });
-      const confidenceThreshold = textTicks.length * 0.2;
-      return maxMatches >= confidenceThreshold ? bestChannel : null;
+      }
+      return bestScore >= 0.4 ? bestChannel : null;
     }
     #decodeKaraokeString(str) {
       if (!str) return "";
