@@ -47,6 +47,7 @@ export default class Dial {
 		this.#startY = e.clientY;
 		this.#startT = this.#t;
 		this.#dial.style.cursor = 'grabbing';
+		// document.documentElement.style.cursor = 'grabbing';
 		e.preventDefault();
 	}
 
@@ -69,6 +70,7 @@ export default class Dial {
 	#mouseup(e) {
 		this.#dragging = false;
 		this.#dial.style.cursor = 'ns-resize';
+		// document.documentElement.style.cursor = 'ns-resize';
 	}
 
 

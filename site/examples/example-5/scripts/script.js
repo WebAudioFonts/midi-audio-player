@@ -9,6 +9,8 @@ import ProgramChooser from "./libraries/programchooser";
 
 ({
 	song: '../../data/closer.mid',
+	setup: '../../data/closer_setup.json',
+	filename: 'closer',
 	firstPlay: true,
 
 	player: null,
@@ -52,13 +54,12 @@ import ProgramChooser from "./libraries/programchooser";
 
 
 	init: async function() {
+		await documentReady();
 		this.log("Initializing player...");
 		await this.initUI();
 		await this.initPlayer();
 		await this.startWorker();
-		const response = await fetch(this.song);
-		const buffer = await response.arrayBuffer();
-		await this.player.load(buffer);
+		await this.player.load(this.song, this.setup);
 	},
 
 
@@ -155,15 +156,20 @@ import ProgramChooser from "./libraries/programchooser";
 		this.presets = {};
 		this.programs = {};
 		const channels = this.player.channels;
+		const volumes = this.player.volumes;
 		const parent = create('div', 'instruments');
 		await Promise.all(Object.keys(channels).map(async channel => this.presets[channels[channel].preset.program] = await this.player.getProgramInstruments(channels[channel].preset.program)));
 		await Promise.all(Object.keys(channels).map(async channel => {
-			this.programs[channel] = new ProgramChooser(parent, channel, channels[channel].preset.program, this.presets[channels[channel].preset.program], channels[channel].preset.id);
+			this.programs[channel] = new ProgramChooser(parent, channel, channels[channel].preset.program, this.presets[channels[channel].preset.program], channels[channel].preset.id, volumes[channel]);
 			this.programs[channel].presetCallback = presetCallback;
 			this.programs[channel].volumeCallback = volumeCallback;
 		}));
 		await new Promise(requestAnimationFrame);
 		this.ctrlPrograms.replaceChildren(parent);
+		this.ctrlPrograms.create('hr');
+		const btnwrapper = this.ctrlPrograms.create('div', 'programs__btnwrapper');
+		btnwrapper.create('button', null, 'Save Song Setup').addEventListener('click', () => this.saveSongSetup());
+		btnwrapper.create('button', null, 'Save Training Presets').addEventListener('click', () => this.saveTrainingPresets());
 	},
 
 
@@ -230,6 +236,7 @@ import ProgramChooser from "./libraries/programchooser";
 		this.freeze();
 		try {
 			this.log('File droped');
+			this.filename = file.name.replace(/\.[a-z]+$/i, '');
 			if(this.player.isPlaying()) this.player.stop(true);
 			const buffer = await file.arrayBuffer();
 			await this.player.load(buffer);
@@ -238,6 +245,18 @@ import ProgramChooser from "./libraries/programchooser";
 			this.log(`Error: ${e}`);
 			this.unfreeze();
 		}
+	},
+
+
+	saveSongSetup: async function() {
+		const setup = await this.player.getSongSetup();
+		downloadJsonObject(setup, `${this.filename}_setup.json`);
+	},
+
+
+	saveTrainingPresets: async function() {
+		const presets = await this.player.getTrainingPresets();
+		downloadJsonObject(presets, 'training_presets.json');
 	},
 
 

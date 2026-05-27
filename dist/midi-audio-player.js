@@ -1917,15 +1917,16 @@
     #channels = {};
     #channelVolumes = {};
     #presetMap = {};
+    #presetMapThread = null;
     #lyrics = null;
     #haveLyrics = false;
     #title = "";
     #opts = {
       endpoint: _MidiAudioPlayer.ENDPOINT,
       volume: 0.7,
-      reverb: 0,
+      reverb: 0.3,
       onEndFile: null,
-      localCache: false,
+      localCache: true,
       presetRandom: false,
       karaoke: false,
       karaokeDelay: 0,
@@ -1938,7 +1939,7 @@
     constructor(opts = {}) {
       super();
       this.#opts = { ...this.#opts, ...opts };
-      this.mapPresets();
+      this.#presetMapThread = this.#mapPresets();
       this.#audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       this.#compressor = new AudioCompressor(this.#audioCtx, this.#opts.volume, this.#opts.reverb);
       this.#compressor.setEQPreset(this.#opts.eqPreset);
@@ -1959,6 +1960,9 @@
     set volume(vol) {
       this.#opts.volume = clamp(vol, 0, 1);
       this.#compressor.masterVolume = this.#opts.volume;
+    }
+    get volumes() {
+      return this.#channelVolumes;
     }
     get rever() {
       return this.#compressor.reverb;
@@ -1990,11 +1994,11 @@
     setChannelVolume(channel, volume) {
       this.#channelVolumes[channel] = volume;
     }
-    mapPresets() {
-      this.#opts.presets.map(async (p) => {
+    async #mapPresets() {
+      await Promise.all(this.#opts.presets.map(async (p) => {
         const preset = await this.findPreset(p);
         if (preset) this.#presetMap[preset.program] = preset;
-      });
+      }));
     }
     async findPreset(id) {
       let preset = null;
@@ -2071,14 +2075,25 @@
         throw new Error("Invalid preset: ".concat(id));
       }
     }
-    /** à revoir */
-    async loadPreset(presetId, channel = null) {
+    async loadPreset(presetId, channel) {
+      const presetInfo = await this.findPreset(presetId);
+      if (!presetInfo) throw new Error("Invalid preset: ".concat(presetId));
+      this.#presetMap[presetInfo.program] = presetInfo;
       const preset = await this.getPreset(presetId);
-      if (channel !== null) {
-        this.#players[channel].preset = preset;
-      }
+      this.#players[channel].preset = preset;
     }
-    async load(content) {
+    async load(content, setup) {
+      if (typeof content === "string") {
+        this.#log("Downloading song...");
+        const response = await fetch(content);
+        content = await response.arrayBuffer();
+      }
+      if (typeof setup === "string") {
+        this.#log("Downloading setup...");
+        const response = await fetch(setup);
+        setup = await response.json();
+      }
+      await this.#presetMapThread;
       if (this.isPlaying()) this.stop();
       this.#clearActiveNotes();
       await Promise.all(Object.values(this.#players).map(async (player) => player.close()));
@@ -2096,9 +2111,26 @@
       this.#channels = await this.#getInstruments();
       this.#channelStates = Object.keys(this.#channels).reduce((acc, key) => ({ ...acc, [key]: false }), {});
       this.#channelVolumes = Object.keys(this.#channels).reduce((acc, key) => ({ ...acc, [key]: 1 }), {});
+      if (setup?.volumes !== void 0) {
+        await Promise.all(Object.keys(setup.volumes).map(async (channel) => {
+          if (this.#channelVolumes[channel] === void 0) return;
+          this.#channelVolumes[channel] = setup.volumes[channel];
+        }));
+      }
+      const setupPrograms = /* @__PURE__ */ new Set();
+      const setupPresets = {};
+      if (setup?.presets !== void 0) {
+        await Promise.all(Object.keys(setup.presets).map(async (channel) => {
+          const presetInfo = await this.findPreset(setup.presets[channel]);
+          if (!presetInfo) return;
+          setupPresets[channel] = await this.getPreset(presetInfo.id);
+          setupPrograms.add(presetInfo.program);
+        }));
+      }
       const uniqueInstruments = await this.#getUniqueInstruments();
       if (!Object.values(this.#channels).length) this.#log("Error: no instrument found");
       const presets = Promise.all([...uniqueInstruments].map(async (program) => {
+        if (setupPrograms.has(program)) return;
         let preset = null;
         if (this.#presetMap[program] !== void 0) preset = await this.getPreset(this.#presetMap[program].id);
         else if (this.#opts.presetRandom) preset = await this.#getRandomPreset(program);
@@ -2117,12 +2149,22 @@
       await presets;
       await Promise.all(Object.keys(this.#channels).map(async (channel) => {
         if (this.#players[channel]) this.#players[channel].close();
-        this.#players[channel] = await this.#createPlayer(this.#instruments[this.#channels[channel]]);
+        if (setupPresets[channel] !== void 0) this.#players[channel] = await this.#createPlayer(setupPresets[channel]);
+        else this.#players[channel] = await this.#createPlayer(this.#instruments[this.#channels[channel]]);
       }));
       this.#log("Initializing instrument states...");
       await this.#initInstrumentStates();
       await this.triggerPlayerEvent("presetsLoaded", this.#instruments);
       this.#log("Player ready");
+    }
+    async getSongSetup() {
+      let setup = { presets: {}, volumes: {} };
+      Object.keys(this.#players).map(async (channel) => setup.presets[channel] = this.#players[channel].preset.id);
+      setup.volumes = this.#channelVolumes;
+      return setup;
+    }
+    async getTrainingPresets() {
+      return await Promise.all(Object.values(this.#presetMap).map(async (preset) => preset.id));
     }
     async play(content = null) {
       if (this.#audioCtx.state === "suspended") {

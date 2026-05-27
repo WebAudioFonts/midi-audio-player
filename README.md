@@ -9,7 +9,19 @@ A lightweight JavaScript MIDI audio player built on top of the Web Audio API usi
 * Uses WebAudioFont for preset rendering
 * Lightweight and dependency-minimal
 * Simple programmatic API
-* CLI tool for preset/font handling
+* Auto-repair corrupted midi files
+* Trim silence at start and end
+* Karaoke support
+* Over 3000+ free instrument presets
+* Possibility to have your own presets endpoint with sf2-json deployement template
+* Convolution reverb
+* 10 bands compressor
+* 10 bands equalizer
+* Per channel volume
+* SVG Waveform
+* Realtime amplitude analyzer
+* FUll midi protocol support (pitchbend etc...)
+
 
 ## Installation
 

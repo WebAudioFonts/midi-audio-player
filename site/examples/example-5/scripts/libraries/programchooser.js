@@ -6,6 +6,7 @@ export default class ProgramChooser {
 	#channel = null;
 	#presets = null;
 	#selpreset = null;
+	#volume = null;
 	#light = null;
 	#active = false;
 	#currentAnimation = null;
@@ -16,11 +17,12 @@ export default class ProgramChooser {
 	#dial = null;
 
 
-	constructor(parent, channel, program, presets, selpreset) {
+	constructor(parent, channel, program, presets, selpreset, volume) {
 		this.#parent = parent;
 		this.#channel = channel;
 		this.#program = program;
 		this.#selpreset = selpreset;
+		this.#volume = volume;
 		presets.forEach(preset => {
 			const match = preset.id.match(/^([0-9]{3})([0-9]+)_(.*)$/);
 			preset.label = `${preset.name} / ${match[3]} #${+match[2] + 1}`;
@@ -47,11 +49,9 @@ export default class ProgramChooser {
 		container.create('div', 'program', `#${this.#channel}`);
 		container.create('div', `inst gm-${(Math.floor(this.#program / 8) + 1).toString().padStart(2, '0')}`);
 		this.#light = container.create('div', 'light');
-		this.#dial = new Dial(container, 'instrument', 1 * 0.75, val => {
+		this.#dial = new Dial(container, 'instrument', this.#volume * 0.75, val => {
 			if(typeof this.#volumeCallback === 'function') this.#volumeCallback((val / 0.75), this.#channel);
 		});
-
-
 		this.#parent.appendChild(container);
 	}
 

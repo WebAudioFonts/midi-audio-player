@@ -14,27 +14,28 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     static REFERENCE_GAIN  = 0.15;
     static KARAOKE_CHANNEL = 0;
 
-    #catalog        = null;
-	#audioCtx       = null;
-	#compressor     = null;
-    #vocalChannel   = null;
-    #activeNotes    = {};
-    #channelStates  = {};
-    #instruments    = {};
-    #players        = {};
-    #channels       = {};
-    #channelVolumes = {};
-    #presetMap      = {};
-    #lyrics         = null;
-    #haveLyrics     = false;
-    #title          = '';
+    #catalog         = null;
+	#audioCtx        = null;
+	#compressor      = null;
+    #vocalChannel    = null;
+    #activeNotes     = {};
+    #channelStates   = {};
+    #instruments     = {};
+    #players         = {};
+    #channels        = {};
+    #channelVolumes  = {};
+    #presetMap       = {};
+    #presetMapThread = null;
+    #lyrics          = null;
+    #haveLyrics      = false;
+    #title           = '';
 
 	#opts = {
         endpoint: MidiAudioPlayer.ENDPOINT,
         volume: 0.7,
-        reverb: 0,
+        reverb: 0.3,
         onEndFile: null,
-        localCache: false,
+        localCache: true,
         presetRandom: false,
         karaoke: false,
         karaokeDelay: 0,
@@ -49,7 +50,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 	constructor(opts = {}) {
         super();
         this.#opts = { ...this.#opts, ...opts };
-        this.mapPresets();
+        this.#presetMapThread = this.#mapPresets();
 		this.#audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         this.#compressor = new AudioCompressor(this.#audioCtx, this.#opts.volume, this.#opts.reverb);
         this.#compressor.setEQPreset(this.#opts.eqPreset);
@@ -61,6 +62,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     get channelStates() { return this.#channelStates; }
     get volume() { return this.#opts.volume; }
     set volume(vol) { this.#opts.volume = clamp(vol, 0, 1); this.#compressor.masterVolume = this.#opts.volume; }
+    get volumes() { return this.#channelVolumes; }
     get rever() { return this.#compressor.reverb; }
     set rever(rev) { this.#compressor.reverb = rev; }
     get muteExpression() { return this.#opts.muteExpression; }
@@ -73,11 +75,11 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     setChannelVolume(channel, volume) { this.#channelVolumes[channel] = volume; }
 
 
-    mapPresets() {
-        this.#opts.presets.map(async p => {
+    async #mapPresets() {
+        await Promise.all(this.#opts.presets.map(async p => {
             const preset = await this.findPreset(p);
             if(preset) this.#presetMap[preset.program] = preset;
-        });
+        }));
     }
 
 
@@ -167,18 +169,28 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         }
     }
 
-    /** à revoir */ 
-    async loadPreset(presetId, channel = null) {
+
+    async loadPreset(presetId, channel) {
+        const presetInfo = await this.findPreset(presetId);
+        if(!presetInfo) throw new Error(`Invalid preset: ${presetId}`);
+        this.#presetMap[presetInfo.program] = presetInfo;
         const preset = await this.getPreset(presetId);
-
-        if(channel !== null) {
-            this.#players[channel].preset = preset;
-        }
-
+        this.#players[channel].preset = preset;
     }
 
 
-    async load(content) {
+    async load(content, setup) {
+        if(typeof content === 'string') {
+            this.#log('Downloading song...');
+            const response = await fetch(content);
+            content = await response.arrayBuffer();
+        }
+        if(typeof setup === 'string') {
+            this.#log('Downloading setup...');
+            const response = await fetch(setup);
+            setup = await response.json();
+        }
+        await this.#presetMapThread;
 		if(this.isPlaying()) this.stop();
 		this.#clearActiveNotes();
         await Promise.all(Object.values(this.#players).map(async player => player.close()));
@@ -197,9 +209,28 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         this.#channels = await this.#getInstruments();
         this.#channelStates = Object.keys(this.#channels).reduce((acc, key) => ({ ...acc, [key]: false }), {});
         this.#channelVolumes = Object.keys(this.#channels).reduce((acc, key) => ({ ...acc, [key]: 1.0 }), {});
+        if(setup?.volumes !== undefined) {
+            await Promise.all(Object.keys(setup.volumes).map(async channel => {
+                if(this.#channelVolumes[channel] === undefined) return;
+                this.#channelVolumes[channel] = setup.volumes[channel];
+            }));
+        }
+
+        const setupPrograms = new Set();
+        const setupPresets = {};
+        if(setup?.presets !== undefined) {
+            await Promise.all(Object.keys(setup.presets).map(async channel => {
+                const presetInfo = await this.findPreset(setup.presets[channel]);
+                if(!presetInfo) return;
+                setupPresets[channel] = await this.getPreset(presetInfo.id);
+                setupPrograms.add(presetInfo.program);
+            }));
+        }
+
         const uniqueInstruments = await this.#getUniqueInstruments();
         if(!Object.values(this.#channels).length) this.#log("Error: no instrument found");
         const presets = Promise.all([...uniqueInstruments].map(async program => {
+            if(setupPrograms.has(program)) return;
             let preset = null;
             if(this.#presetMap[program] !== undefined) preset = await this.getPreset(this.#presetMap[program].id);
             else if(this.#opts.presetRandom) preset = await this.#getRandomPreset(program);
@@ -221,7 +252,8 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         await presets;
         await Promise.all(Object.keys(this.#channels).map(async channel => {
             if(this.#players[channel]) this.#players[channel].close();
-            this.#players[channel] = await this.#createPlayer(this.#instruments[this.#channels[channel]]);
+            if(setupPresets[channel] !== undefined) this.#players[channel] = await this.#createPlayer(setupPresets[channel]);
+            else this.#players[channel] = await this.#createPlayer(this.#instruments[this.#channels[channel]]);
         }));
 
         this.#log("Initializing instrument states...");
@@ -229,6 +261,19 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         await this.triggerPlayerEvent('presetsLoaded', this.#instruments);
         this.#log("Player ready");
 	}
+
+
+    async getSongSetup() {
+		let setup = { presets: {}, volumes: {} };
+        Object.keys(this.#players).map(async channel => setup.presets[channel] = this.#players[channel].preset.id);
+		setup.volumes = this.#channelVolumes;
+        return setup;
+    }
+
+
+    async getTrainingPresets() {
+        return await Promise.all(Object.values(this.#presetMap).map(async preset => preset.id));
+    }
 
 
 	async play(content = null) {
