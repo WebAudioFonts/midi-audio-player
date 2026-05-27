@@ -49,8 +49,8 @@ export default class ProgramChooser {
 		container.create('div', 'program', `#${this.#channel}`);
 		container.create('div', `inst gm-${(Math.floor(this.#program / 8) + 1).toString().padStart(2, '0')}`);
 		this.#light = container.create('div', 'light');
-		this.#dial = new Dial(container, 'instrument', this.#volume * 0.75, val => {
-			if(typeof this.#volumeCallback === 'function') this.#volumeCallback((val / 0.75), this.#channel);
+		this.#dial = new Dial(container, 'instrument', this.#volume * 0.6, val => {
+			if(typeof this.#volumeCallback === 'function') this.#volumeCallback((val / 0.6), this.#channel);
 		});
 		this.#parent.appendChild(container);
 	}

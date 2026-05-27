@@ -41,7 +41,7 @@ import ProgramChooser from "./libraries/programchooser";
 	worker: null,
 
 	opts: {
-		volume: localStorage.getItem('waf_volume') || 0.7,
+		volume: localStorage.getItem('waf_volume') || 0.6,
 		reverb: 0.3,
 		presetRandom: true,
 		localCache: true,

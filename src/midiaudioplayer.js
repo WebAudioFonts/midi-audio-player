@@ -2,7 +2,7 @@ import MidiPlayer from 'midi-player-js';
 import WebAudioFontPlayer from 'webaudiofontplayer';
 import AudioCompressor from './libraries/audiocompressor';
 import indexedDbStorage from './libraries/indexeddbstorage';
-import DefaultPreset from "./presets/defaultpreset.json";
+// import DefaultPreset from "./presets/defaultpreset.json";
 
 const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
@@ -32,7 +32,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
 	#opts = {
         endpoint: MidiAudioPlayer.ENDPOINT,
-        volume: 0.7,
+        volume: 0.6,
         reverb: 0.3,
         onEndFile: null,
         localCache: true,
@@ -149,7 +149,6 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
     async getPreset(id) {
         try {
-            if(id == '-1') return DefaultPreset;
             if(typeof id === 'object') return id;
             const cacheid = `waf_preset_${id}`;
             const cachedata = this.#opts.localCache ? await indexedDbStorage.getItem(cacheid) : null;
