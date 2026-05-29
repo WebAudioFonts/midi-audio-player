@@ -8,7 +8,7 @@ const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
 export default class MidiAudioPlayer extends MidiPlayer.Player {
 
-    static ENDPOINT        = 'https://webaudiofonts.github.io/presets/';
+    static ENDPOINT        = 'https://webaudiofonts.com/presets/';
     static DEFAULT_PRESET  = -1;
     static REFERENCE_GAIN  = 0.15;
     static KARAOKE_CHANNEL = 0;
@@ -64,8 +64,8 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     get volume() { return this.#opts.volume; }
     set volume(vol) { this.#opts.volume = clamp(vol, 0, 1); this.#compressor.masterVolume = this.#opts.volume; }
     get volumes() { return this.#channelVolumes; }
-    get rever() { return this.#compressor.reverb; }
-    set rever(rev) { this.#compressor.reverb = rev; }
+    get reverb() { return this.#compressor.reverb; }
+    set reverb(rev) { this.#compressor.reverb = rev; }
     get muteExpression() { return this.#opts.muteExpression; }
     set muteExpression(val) { this.#opts.muteExpression = Boolean(val); }
     get eqFrequencies() { return this.#compressor.eqFrequencies; }
@@ -282,10 +282,10 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
 	async play(content = null) {
         if (this.#audioCtx.state === 'suspended') {
-            try { if(!await this.#audioCtx.resume()) return false; }
+            try { await this.#audioCtx.resume(); }
             catch (e) { return false; }
         }
-		if(content) await this.load(content);
+        if(content) await this.load(content);
         await Promise.all(Object.keys(this.#players).map(async k => await this.#players[k]?.cancelQueue()));
         this.#compressor.restoreReverb();
         if(!this.isPlaying()) {
@@ -1430,7 +1430,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     }
 
 
-    async #log(str, err = false) {
+    #log(str, err = false) {
         queueMicrotask(() => this.triggerPlayerEvent('logs', str));
     }
 

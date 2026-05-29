@@ -1,3 +1,5 @@
+![logo](https://webaudiofonts.com/images/logo.svg)
+
 # midi-audio-player
 
 **Real MIDI playback in the browser — powered by Web Audio API and WebAudioFont.**
@@ -102,7 +104,7 @@ Creates a new player instance and initializes the full Web Audio signal chain.
 | Property | Type | Description |
 |---|---|---|
 | `volume` | `number` (get/set) | Master output volume `[0, 1]`. |
-| `rever` | `number` (get/set) | Reverb wet mix `[0, 1]`. |
+| `reverb` | `number` (get/set) | Reverb wet mix `[0, 1]`. |
 | `muteExpression` | `boolean` (get/set) | Enable/disable vocal channel muting. |
 | `eq` | `EQGains` (get) | Current EQ band gains as a frequency → dB map. |
 | `eqFrequencies` | `number[]` (get) | The 10 fixed EQ frequencies: `[32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]`. |
@@ -177,7 +179,7 @@ categories.forEach(c => console.log(c.name));
 Finds a preset by its string ID and returns its full metadata, including `category`, `instrument`, and `program`.
 
 ```ts
-const info = await player.findPreset('0000_FluidR3_GM_sf2_file');
+const info = await player.findPreset('0000_FluidR3');
 // { id: '0000_...', category: 'Piano', instrument: 'Acoustic Grand Piano', program: 1 }
 ```
 
@@ -186,7 +188,7 @@ const info = await player.findPreset('0000_FluidR3_GM_sf2_file');
 Replaces the instrument on a specific MIDI channel at runtime.
 
 ```ts
-await player.loadPreset('0000_Steinway_sf2_file', 1);
+await player.loadPreset('0000_Steinway', 1);
 ```
 
 ---
@@ -379,7 +381,7 @@ player.on('presetsLoaded', () => playButton.disabled = false);
 Emitted when playback reaches the end of the MIDI file.
 
 ```ts
-player.on('endOfFile', () => player.stop());
+player.on('endOfFile', () => playNextSong());
 ```
 
 #### `karaoke`

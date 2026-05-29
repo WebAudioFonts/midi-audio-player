@@ -41,10 +41,12 @@
   ],
   "exports": {
     ".": {
+      "types": "./index.d.ts",
       "import": "./dist/index.js",
       "script": "./dist/midi-audio-player.min.js"
     }
   },
+  "types": "index.d.ts",
   "scripts": {
     "build": "node scripts/watch.js --build",
     "dev": "node scripts/watch.js",

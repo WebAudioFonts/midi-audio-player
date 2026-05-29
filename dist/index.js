@@ -8,10 +8,10 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 2.0.0
-	Build:   2026-05-27 00:45:56
+	Build:   2026-05-29 17:11:42
 	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
-	Github:  https://github.com/ZmotriN/midi-audio-player/
-	Website: https://zmotrin.github.io/midi-audio-player/
+	Github:  https://github.com/webaudiofonts/midi-audio-player/
+	Website: https://webaudiofonts.github.io/midi-audio-player/
 
 */
 
@@ -1783,7 +1783,7 @@ var indexeddbstorage_default = indexedDbStorage;
 // src/midiaudioplayer.js
 var clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
-  static ENDPOINT = "https://webaudiofonts.github.io/presets/";
+  static ENDPOINT = "https://webaudiofonts.com/presets/";
   static DEFAULT_PRESET = -1;
   static REFERENCE_GAIN = 0.15;
   static KARAOKE_CHANNEL = 0;
@@ -1847,10 +1847,10 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
   get volumes() {
     return this.#channelVolumes;
   }
-  get rever() {
+  get reverb() {
     return this.#compressor.reverb;
   }
-  set rever(rev) {
+  set reverb(rev) {
     this.#compressor.reverb = rev;
   }
   get muteExpression() {
@@ -2055,7 +2055,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
   async play(content = null) {
     if (this.#audioCtx.state === "suspended") {
       try {
-        if (!await this.#audioCtx.resume()) return false;
+        await this.#audioCtx.resume();
       } catch (e) {
         return false;
       }
@@ -3098,7 +3098,7 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
       else queueMicrotask(() => this.triggerPlayerEvent("karaoke", { type, html }));
     }
   }
-  async #log(str, err = false) {
+  #log(str, err = false) {
     queueMicrotask(() => this.triggerPlayerEvent("logs", str));
   }
 };
