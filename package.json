@@ -14,7 +14,7 @@
     "web-audio-api",
     "midi-playback"
   ],
-  "homepage": "https://WebAudioFonts.github.io/",
+  "homepage": "https://webaudiofonts.com/",
   "bugs": {
     "url": "https://github.com/WebAudioFonts/midi-audio-player/issues"
   },
@@ -31,7 +31,6 @@
   "jsdelivr": "./dist/midi-audio-player.min.js",
   "files": [
     "dist",
-    "bin",
     "src",
     "index.js",
     "index.d.ts",
@@ -49,19 +48,14 @@
   "types": "index.d.ts",
   "scripts": {
     "build": "node scripts/watch.js --build",
-    "dev": "node scripts/watch.js",
-    "sass:build": "sass site/:site/ --no-source-map",
-    "sass:watch": "sass site/:site/ --no-source-map --watch",
-    "serve:site": "browser-sync start --server --startPath /site/ --files \"site/**/*.html, site/**/*.css, site/**/*.js, dist/**/*.js\""
+    "dev": "node scripts/watch.js"
   },
   "dependencies": {
     "midi-player-js": "^2.0.17",
     "webaudiofontplayer": "^1.0.0"
   },
   "devDependencies": {
-    "browser-sync": "^3.0.4",
-    "esbuild": "^0.28.0",
-    "sass": "^1.100.0"
+    "esbuild": "^0.28.0"
   },
   "engines": {
     "node": ">=18"

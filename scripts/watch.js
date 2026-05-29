@@ -39,7 +39,6 @@ const formats = [
     { format: 'esm', minify: true, outfile: 'dist/index.mjs' },
     { format: 'iife', platform: "browser", sourcemap: false, outfile: 'dist/midi-audio-player.js' },
     { format: 'iife', platform: "browser", sourcemap: false, minify: true, outfile: 'dist/midi-audio-player.min.js' },
-	{ format: 'iife', platform: "browser", sourcemap: true, minify: true, entryPoints: ['site/examples/example-5/scripts/script.js'], outfile: 'site/examples/example-5/scripts/script.min.js' },
 ];
 
 async function run() {

@@ -12,30 +12,6 @@
 				"panel": "dedicated",
 				"reveal": "never"
 			}
-		},
-		{
-			"label": "Serve: Site",
-			"type": "npm",
-			"script": "serve:site",
-			"isBackground": true,
-			"problemMatcher": [],
-			"presentation": {
-				"group": "dev-group",
-				"panel": "dedicated",
-				"reveal": "never"
-			}
-		},
-		{
-			"label": "Watch: Sass",
-			"type": "shell",
-			"command": "npm run sass:watch",
-			"isBackground": true,
-			"problemMatcher": [],
-			"presentation": {
-				"group": "dev-group",
-				"panel": "dedicated",
-				"reveal": "never"
-			}
 		}
 	]
 }

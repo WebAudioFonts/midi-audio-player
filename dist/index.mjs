@@ -8,7 +8,7 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 2.0.0
-	Build:   2026-05-29 17:11:42
+	Build:   2026-05-29 17:16:44
 	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/webaudiofonts/midi-audio-player/
 	Website: https://webaudiofonts.github.io/midi-audio-player/
