@@ -280,6 +280,46 @@ await player.skipToSeconds(45.0);
 
 ---
 
+### Runtime Playback Tempo
+
+#### `setPlaybackTempo(factor: number) → MidiAudioPlayer`
+
+Scales playback speed at runtime without reloading the MIDI file.
+
+`factor` is a speed multiplier relative to the song's natural MIDI tempo:
+
+| Value | Effect |
+|-------|--------|
+| `1.0` | Normal speed (default) |
+| `0.5` | Half speed — twice as slow |
+| `2.0` | Double speed — twice as fast |
+
+Songs with internal tempo changes retain their relative structure at the new speed.
+If the player is currently playing, the current tick position is preserved — no jump, no silence.
+
+```ts
+player.setPlaybackTempo(0.5);   // half speed
+player.setPlaybackTempo(1.25);  // 25% faster
+```
+
+> **Note:** `computed.duration` is always the natural MIDI duration computed at load time.
+> `getSongTimeRemaining()` is always accurate — it recomputes from the live tempo map.
+
+#### `getPlaybackTempo() → number`
+
+Returns the current speed factor (`1.0` if not overridden).
+
+#### `resetPlaybackTempo() → MidiAudioPlayer`
+
+Restores the original tempo and resets the factor to `1.0`.
+If playing, the tick position is preserved at the restored tempo.
+
+```ts
+player.resetPlaybackTempo();
+```
+
+---
+
 ### Metering & Visualization
 
 #### `getRealTimeVolume() → number`

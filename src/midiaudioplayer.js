@@ -27,9 +27,11 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
     #bufferHash      = null;
     #presetTimer     = null;
     #presetMapThread = null;
-    #lyrics          = null;
-    #haveLyrics      = false;
-    #title           = '';
+    #lyrics             = null;
+    #haveLyrics         = false;
+    #title              = '';
+    #originalTempoMap   = null;
+    #playbackFactor     = 1.0;
 
 	#opts = {
         endpoint: MidiAudioPlayer.ENDPOINT,
@@ -195,6 +197,8 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         await this.#presetMapThread;
 		if(this.isPlaying()) this.stop();
 		this.#clearActiveNotes();
+        this.#originalTempoMap = null;
+        this.#playbackFactor   = 1.0;
         await Promise.all(Object.values(this.#players).map(async player => player.close()));
         this.#players = {};
         this.#instruments = {};
@@ -330,6 +334,58 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
 
     getSongTimeRemaining() {
         return this.ticksToSeconds(this.getCurrentTick(), this.totalTicks);
+    }
+
+
+    setPlaybackTempo(factor) {
+        if (!isFinite(factor) || factor <= 0) return this;
+        const map = this.tempoMap;
+        if (!map || map.length === 0) return this;
+        // Capture current position before any changes
+        const playing    = this.isPlaying();
+        const beforeTick = playing ? this.getCurrentTick() : (this.startTick || 0);
+        const startTick  = this.startTick || 0;
+        // Save original map on first call
+        if (!this.#originalTempoMap) {
+            this.#originalTempoMap = map.map(e => ({ ...e }));
+        }
+        // Scale every entry from the original by the requested factor
+        this.#originalTempoMap.forEach((orig, i) => {
+            map[i].tempo = Math.round(orig.tempo * factor);
+        });
+        // Re-anchor so the current tick position is preserved under the new tempo
+        if (playing) {
+            const newElapsed = this.ticksToSeconds(0, beforeTick) - this.ticksToSeconds(0, startTick);
+            this.setStartTime(Date.now() - Math.round(newElapsed * 1000));
+        }
+        this.#playbackFactor = factor;
+        return this;
+    }
+
+
+    getPlaybackTempo() {
+        return this.#playbackFactor;
+    }
+
+
+    resetPlaybackTempo() {
+        if (!this.#originalTempoMap) return this;
+        const map        = this.tempoMap;
+        const playing    = this.isPlaying();
+        const beforeTick = playing ? this.getCurrentTick() : (this.startTick || 0);
+        const startTick  = this.startTick || 0;
+        // Restore all entries from the saved original
+        this.#originalTempoMap.forEach((orig, i) => {
+            if (map[i]) map[i].tempo = orig.tempo;
+        });
+        // Re-anchor to preserve position at the restored tempo
+        if (playing) {
+            const newElapsed = this.ticksToSeconds(0, beforeTick) - this.ticksToSeconds(0, startTick);
+            this.setStartTime(Date.now() - Math.round(newElapsed * 1000));
+        }
+        this.#originalTempoMap = null;
+        this.#playbackFactor   = 1.0;
+        return this;
     }
 
 
