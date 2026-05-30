@@ -8,7 +8,7 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 2.0.0
-	Build:   2026-05-29 17:16:44
+	Build:   2026-05-30 12:21:02
 	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/webaudiofonts/midi-audio-player/
 	Website: https://webaudiofonts.github.io/midi-audio-player/
@@ -1804,6 +1804,8 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
   #lyrics = null;
   #haveLyrics = false;
   #title = "";
+  #originalTempoMap = null;
+  #playbackFactor = 1;
   #opts = {
     endpoint: _MidiAudioPlayer.ENDPOINT,
     volume: 0.6,
@@ -1981,6 +1983,8 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
     await this.#presetMapThread;
     if (this.isPlaying()) this.stop();
     this.#clearActiveNotes();
+    this.#originalTempoMap = null;
+    this.#playbackFactor = 1;
     await Promise.all(Object.values(this.#players).map(async (player) => player.close()));
     this.#players = {};
     this.#instruments = {};
@@ -2097,6 +2101,46 @@ var MidiAudioPlayer = class _MidiAudioPlayer extends index.Player {
   }
   getSongTimeRemaining() {
     return this.ticksToSeconds(this.getCurrentTick(), this.totalTicks);
+  }
+  setPlaybackTempo(factor) {
+    if (!isFinite(factor) || factor <= 0) return this;
+    const map = this.tempoMap;
+    if (!map || map.length === 0) return this;
+    const playing = this.isPlaying();
+    const beforeTick = playing ? this.getCurrentTick() : this.startTick || 0;
+    const startTick = this.startTick || 0;
+    if (!this.#originalTempoMap) {
+      this.#originalTempoMap = map.map((e) => ({ ...e }));
+    }
+    this.#originalTempoMap.forEach((orig, i) => {
+      map[i].tempo = Math.round(orig.tempo * factor);
+    });
+    if (playing) {
+      const newElapsed = this.ticksToSeconds(0, beforeTick) - this.ticksToSeconds(0, startTick);
+      this.setStartTime(Date.now() - Math.round(newElapsed * 1e3));
+    }
+    this.#playbackFactor = factor;
+    return this;
+  }
+  getPlaybackTempo() {
+    return this.#playbackFactor;
+  }
+  resetPlaybackTempo() {
+    if (!this.#originalTempoMap) return this;
+    const map = this.tempoMap;
+    const playing = this.isPlaying();
+    const beforeTick = playing ? this.getCurrentTick() : this.startTick || 0;
+    const startTick = this.startTick || 0;
+    this.#originalTempoMap.forEach((orig, i) => {
+      if (map[i]) map[i].tempo = orig.tempo;
+    });
+    if (playing) {
+      const newElapsed = this.ticksToSeconds(0, beforeTick) - this.ticksToSeconds(0, startTick);
+      this.setStartTime(Date.now() - Math.round(newElapsed * 1e3));
+    }
+    this.#originalTempoMap = null;
+    this.#playbackFactor = 1;
+    return this;
   }
   async skipToSeconds(seconds) {
     const songTime = this.getSongTime();

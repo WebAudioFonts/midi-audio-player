@@ -848,6 +848,59 @@ declare class MidiAudioPlayer {
     getSongTimeRemaining(): number;
 
     /**
+     * Scales playback speed at runtime without reloading the MIDI file.
+     *
+     * `factor` is a speed multiplier relative to the song's natural MIDI tempo:
+     * - `1.0` — normal speed (default)
+     * - `0.5` — half speed (twice as slow)
+     * - `2.0` — double speed (twice as fast)
+     *
+     * All tempo-map entries are multiplied proportionally, so songs with
+     * internal tempo changes retain their relative structure at the new speed.
+     *
+     * If the player is currently playing, `startTime` is re-anchored so
+     * the current tick position is preserved — no jump, no silence.
+     *
+     * `computed.duration` is **not** updated; it always reflects the natural MIDI
+     * duration at load time. `getSongTimeRemaining()` is always accurate because
+     * it recomputes from the live tempo map.
+     *
+     * @param factor - Speed multiplier. Must be a finite positive number.
+     * @returns The player instance, for chaining.
+     *
+     * @example
+     * player.setPlaybackTempo(0.5);   // half speed
+     * player.setPlaybackTempo(1.25);  // 25% faster
+     */
+    setPlaybackTempo(factor: number): MidiAudioPlayer;
+
+    /**
+     * Returns the current playback speed factor.
+     *
+     * Returns `1.0` if `setPlaybackTempo()` has not been called since the last
+     * `load()` or `resetPlaybackTempo()`.
+     *
+     * @example
+     * console.log(player.getPlaybackTempo()); // 0.5
+     */
+    getPlaybackTempo(): number;
+
+    /**
+     * Restores the original MIDI tempo map and resets the speed factor to `1.0`.
+     *
+     * If the player is currently playing, `startTime` is re-anchored so the
+     * current tick position is preserved at the restored tempo — no jump or silence.
+     *
+     * No-op if `setPlaybackTempo()` has not been called since the last `load()`.
+     *
+     * @returns The player instance, for chaining.
+     *
+     * @example
+     * player.resetPlaybackTempo(); // back to natural speed
+     */
+    resetPlaybackTempo(): MidiAudioPlayer;
+
+    /**
      * Generates an SVG waveform representation of the loaded MIDI file,
      * based on note velocities and channel expression/volume controllers.
      *
