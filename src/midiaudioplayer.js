@@ -1028,7 +1028,7 @@ export default class MidiAudioPlayer extends MidiPlayer.Player {
         });
         this.events = trimmedEvents;
         this.totalTicks = lastNoteTick - firstNoteTick;
-        if (typeof this.computeTempoMap === 'function') this.computeTempoMap();
+        if (typeof this.buildTempoMap === 'function') this.buildTempoMap();
     }
 
 

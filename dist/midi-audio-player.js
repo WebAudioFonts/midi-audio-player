@@ -8,7 +8,7 @@
 	╚═╝     ╚═╝╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 
 	Version: 2.0.0
-	Build:   2026-05-29 17:16:44
+	Build:   2026-05-30 10:05:39
 	Author:  Maxime Larrivée-Roy <mlarriveeroy@gmail.com>
 	Github:  https://github.com/webaudiofonts/midi-audio-player/
 	Website: https://webaudiofonts.github.io/midi-audio-player/
@@ -2732,7 +2732,7 @@
       });
       this.events = trimmedEvents;
       this.totalTicks = lastNoteTick - firstNoteTick;
-      if (typeof this.computeTempoMap === "function") this.computeTempoMap();
+      if (typeof this.buildTempoMap === "function") this.buildTempoMap();
     }
     async #extractLyrics() {
       if (this.#lyrics) return this.#lyrics;
